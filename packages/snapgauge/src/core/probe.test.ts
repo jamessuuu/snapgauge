@@ -57,6 +57,12 @@ function recordOptions(overrides?: Partial<RecordOptions>): RecordOptions {
   };
 }
 
+async function recordSnapshot(overrides?: Partial<RecordOptions>) {
+  const outcome = await record(recordOptions(overrides));
+  expect(outcome.probeFailures).toEqual([]);
+  return outcome.snapshot;
+}
+
 async function expectFailure(promise: Promise<unknown>, code: ErrorCode): Promise<void> {
   try {
     await promise;
@@ -70,7 +76,7 @@ async function expectFailure(promise: Promise<unknown>, code: ErrorCode): Promis
 
 describe("record (SPEC §2, §4, §6)", () => {
   it("sorts tools by name in the body while toolsList.order preserves observed order", async () => {
-    const snapshot = await record(recordOptions());
+    const snapshot = await recordSnapshot();
     expect(snapshot.tools.map((t) => t.name)).toEqual(["alpha", "zulu"]);
     expect(snapshot.toolsList.order).toEqual(["zulu", "alpha"]);
     expect(snapshot.toolsList.pages).toBe(1);
@@ -81,14 +87,14 @@ describe("record (SPEC §2, §4, §6)", () => {
   });
 
   it("is deterministic: identical inputs yield byte-identical canonical snapshots", async () => {
-    const one = await record(recordOptions());
-    const two = await record(recordOptions());
+    const one = await recordSnapshot();
+    const two = await recordSnapshot();
     expect(canonicalStringify(one)).toBe(canonicalStringify(two));
   });
 
   it("excludes recordedAt from diffs (SPEC §2: metadata)", async () => {
-    const one = await record(recordOptions({ recordedAt: "2026-08-08T00:00:00Z" }));
-    const two = await record(recordOptions({ recordedAt: "2026-08-09T12:34:56Z" }));
+    const one = await recordSnapshot({ recordedAt: "2026-08-08T00:00:00Z" });
+    const two = await recordSnapshot({ recordedAt: "2026-08-09T12:34:56Z" });
     expect(diffSnapshots(one, two).findings).toEqual([]);
   });
 
@@ -105,9 +111,7 @@ describe("record (SPEC §2, §4, §6)", () => {
       }
       return ok(request, {});
     };
-    const snapshot = await record(
-      recordOptions({ transport: createFixtureTransport(paged, MODERN_FULL) }),
-    );
+    const snapshot = await recordSnapshot({ transport: createFixtureTransport(paged, MODERN_FULL) });
     expect(snapshot.tools.map((t) => t.name)).toEqual(["first", "second"]);
     expect(snapshot.toolsList.pages).toBe(2);
   });
@@ -123,9 +127,7 @@ describe("record (SPEC §2, §4, §6)", () => {
       }
       return ok(request, {});
     };
-    const snapshot = await record(
-      recordOptions({ transport: createFixtureTransport(flaky, MODERN_FULL) }),
-    );
+    const snapshot = await recordSnapshot({ transport: createFixtureTransport(flaky, MODERN_FULL) });
     expect(snapshot.toolsList.orderStable).toBe(false);
   });
 
@@ -173,16 +175,120 @@ describe("record (SPEC §2, §4, §6)", () => {
       }
       return ok(request, { tools: [tool("alpha")], ttlMs: 1000, cacheScope: "public" });
     };
-    const snapshot = await record(
-      recordOptions({
-        transport: createFixtureTransport(withSeed, MODERN_FULL),
-        volatile: ["discover.capabilities.sessionSeed"],
-      }),
-    );
+    const snapshot = await recordSnapshot({
+      transport: createFixtureTransport(withSeed, MODERN_FULL),
+      volatile: ["discover.capabilities.sessionSeed"],
+    });
     expect(snapshot.discover.capabilities.sessionSeed).toBe("<number>");
   });
 
   it("fails loudly (USAGE) when a volatile selector targets a typed snapshot field", async () => {
     await expectFailure(record(recordOptions({ volatile: ["toolsList.pages"] })), "USAGE");
+  });
+});
+
+describe("behavior probes (SPEC §2 behavior, §6 failure contract)", () => {
+  const SPEC_WITH_PROBES: ProbeSpec = {
+    probes: [
+      { id: "call-alpha", tool: "alpha", arguments: { q: "x" }, capture: "shape" },
+      { id: "call-error", tool: "erroring", arguments: {}, capture: "shape" },
+    ],
+    profiles: ["modern-full"],
+  };
+
+  const behaving: FixtureServer = (request) => {
+    if (request.method === "server/discover") return ok(request, DISCOVER);
+    if (request.method === "tools/list") {
+      return ok(request, { tools: [tool("alpha")], ttlMs: 1000, cacheScope: "public" });
+    }
+    if (request.method === "tools/call") {
+      const name = request.params?.name;
+      if (name === "alpha") {
+        return ok(request, {
+          resultType: "complete",
+          content: [{ type: "text", text: "hello world" }],
+          structuredContent: { items: [{ id: "a", n: 1 }], requestId: "r-123" },
+          _meta: { "vendor/trace": true },
+        });
+      }
+      return {
+        status: 200,
+        headers: { "content-type": "application/json" },
+        body: { jsonrpc: "2.0", id: request.id, error: { code: -32602, message: "bad args" } },
+      };
+    }
+    return ok(request, {});
+  };
+
+  it("captures shape, hashes text blocks, and records errors as data", async () => {
+    const outcome = await record(
+      recordOptions({
+        transport: createFixtureTransport(behaving, MODERN_FULL),
+        probeSpec: SPEC_WITH_PROBES,
+      }),
+    );
+    expect(outcome.probeFailures).toEqual([]);
+    const behavior = outcome.snapshot.behavior;
+    if (behavior === undefined) throw new Error("behavior section missing");
+
+    const alpha = behavior["call-alpha"];
+    expect(alpha?.isError).toBe(false);
+    expect(alpha?.resultType).toBe("complete");
+    expect(alpha?.metaKeys).toEqual(["vendor/trace"]);
+    // Decision 1: text is stored as a hash, never the text itself.
+    const blocks = alpha?.contentBlocks ?? [];
+    expect(JSON.stringify(blocks)).not.toContain("hello world");
+    expect(JSON.stringify(blocks)).toContain('"sha256"');
+    // Shape, not values: structuredContent value "a" must not appear.
+    expect(JSON.stringify(alpha?.structuredShape)).not.toContain('"a"');
+
+    const erroring = behavior["call-error"];
+    expect(erroring?.isError).toBe(true);
+    expect(erroring?.errorCode).toBe(-32602);
+  });
+
+  it("is deterministic across runs (byte-identical snapshots with probes)", async () => {
+    const opts = () =>
+      recordOptions({
+        transport: createFixtureTransport(behaving, MODERN_FULL),
+        probeSpec: SPEC_WITH_PROBES,
+      });
+    const one = await record(opts());
+    const two = await record(opts());
+    expect(canonicalStringify(one.snapshot)).toBe(canonicalStringify(two.snapshot));
+  });
+
+  it("marks a transport-failing probe as missing evidence and keeps probing (SPEC §6)", async () => {
+    const flaky: FixtureServer = (request) => {
+      if (request.method === "tools/call" && request.params?.name === "alpha") {
+        return { status: 503, headers: {}, body: null };
+      }
+      return behaving(request, MODERN_FULL);
+    };
+    const outcome = await record(
+      recordOptions({
+        transport: createFixtureTransport(flaky, MODERN_FULL),
+        probeSpec: SPEC_WITH_PROBES,
+      }),
+    );
+    expect(outcome.probeFailures.map((f) => f.probeId)).toEqual(["call-alpha"]);
+    // The remaining probe still ran and captured its behavior.
+    expect(outcome.snapshot.behavior?.["call-error"]?.errorCode).toBe(-32602);
+    expect(outcome.snapshot.behavior?.["call-alpha"]).toBeUndefined();
+  });
+
+  it("capture values normalizes built-in volatile keys instead of storing them", async () => {
+    const outcome = await record(
+      recordOptions({
+        transport: createFixtureTransport(behaving, MODERN_FULL),
+        probeSpec: {
+          probes: [{ id: "v", tool: "alpha", arguments: {}, capture: "values" }],
+          profiles: ["modern-full"],
+        },
+      }),
+    );
+    const captured = outcome.snapshot.behavior?.v;
+    expect(captured?.structuredContent?.requestId).toBe("<string>");
+    expect(JSON.stringify(captured?.contentBlocks)).toContain("hello world");
   });
 });

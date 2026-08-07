@@ -24,6 +24,12 @@ export type ExitCode = (typeof EXIT)[keyof typeof EXIT];
 export type ErrorCode =
   /** exit 2 — target unreachable, server error mid-probe, malformed response */
   | "PROBE_FAILURE"
+  /** exit 2 — a request exceeded the per-request timeout (SPEC §6) */
+  | "PROBE_TIMEOUT"
+  /** exit 2 — auth classification: token missing/expired; never logged (SPEC §6) */
+  | "AUTH"
+  /** exit 2 — address policy refused the target (SPEC §3 Decision 4); reason class only, never the resolved IP */
+  | "TARGET_NOT_ALLOWED"
   /** exit 4 — bad arguments, unknown fixture/profile, missing file */
   | "USAGE"
   /** exit 4 — a file is not a valid v1 snapshot */
@@ -48,6 +54,9 @@ export class SnapgaugeError extends Error {
 export function exitCodeForError(code: ErrorCode): ExitCode {
   switch (code) {
     case "PROBE_FAILURE":
+    case "PROBE_TIMEOUT":
+    case "AUTH":
+    case "TARGET_NOT_ALLOWED":
       return EXIT.PROBE;
     case "USAGE":
     case "SNAPSHOT_FORMAT":

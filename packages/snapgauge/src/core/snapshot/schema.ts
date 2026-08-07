@@ -62,6 +62,27 @@ export const SnapshotDiscoverSchema = z.strictObject({
   cacheScope: z.string().optional(),
 });
 
+/**
+ * One captured behavior probe (SPEC §2 `behavior`): a tools/call exchange
+ * reduced to its observable contract. JSON-RPC error responses are DATA
+ * (isError + errorCode feed `error.code.changed`); only transport-level
+ * failures keep a probe out of the snapshot entirely (SPEC §6).
+ */
+export const SnapshotBehaviorProbeSchema = z.strictObject({
+  resultType: z.string().optional(),
+  /** Shape capture: text blocks are `{type:"text", sha256}` (Decision 1). */
+  contentBlocks: z.array(JsonValueSchema).optional(),
+  structuredShape: JsonValueSchema.optional(),
+  /** `capture: "values"` only — opt-in per probe (Decision 1). */
+  structuredContent: JsonObjectSchema.optional(),
+  isError: z.boolean(),
+  errorCode: z.number().int().optional(),
+  metaKeys: z.array(z.string()).optional(),
+  httpStatus: z.number().int(),
+  contentType: z.string().optional(),
+});
+export type SnapshotBehaviorProbe = z.infer<typeof SnapshotBehaviorProbeSchema>;
+
 export const SnapshotToolsListSchema = z.strictObject({
   /** Observed order — diffed at its own tier (SPEC §2 Decision 2). */
   order: z.array(z.string()),
@@ -84,13 +105,14 @@ export const SnapshotV1Schema = z.strictObject({
   /** Sorted by name in the body; observed order lives in toolsList.order. */
   tools: z.array(SnapshotToolSchema),
   toolsList: SnapshotToolsListSchema,
-  // Sections below land with later milestones (SPEC §10): resources/prompts
-  // and behavior probing at M2, transport (T-group) and compat (D/X-group)
-  // verdicts at M4. Optional so a v1 snapshot stays honest about what was
-  // actually probed instead of writing empty placeholders.
+  // Optional sections: a snapshot stays honest about what was actually
+  // probed instead of writing empty placeholders. `behavior` is written when
+  // the target declares probes (M2); resources/prompts capture is deferred
+  // (no SPEC §5 tier-table rule consumes them yet); transport (T-group) and
+  // compat (D/X-group) verdicts land at M4.
   resources: JsonObjectSchema.optional(),
   prompts: z.array(JsonValueSchema).optional(),
-  behavior: JsonObjectSchema.optional(),
+  behavior: z.record(z.string(), SnapshotBehaviorProbeSchema).optional(),
   transport: JsonObjectSchema.optional(),
   compat: JsonObjectSchema.optional(),
 });

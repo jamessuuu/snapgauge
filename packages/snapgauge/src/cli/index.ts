@@ -6,12 +6,16 @@
  */
 import { runCli } from "./run.js";
 
-const code = await runCli(process.argv.slice(2), {
-  stdout: (text) => {
-    process.stdout.write(`${text}\n`);
+const code = await runCli(
+  process.argv.slice(2),
+  {
+    stdout: (text) => {
+      process.stdout.write(`${text}\n`);
+    },
+    stderr: (text) => {
+      process.stderr.write(`${text}\n`);
+    },
   },
-  stderr: (text) => {
-    process.stderr.write(`${text}\n`);
-  },
-});
+  { cwd: process.cwd(), env: process.env },
+);
 process.exit(code);

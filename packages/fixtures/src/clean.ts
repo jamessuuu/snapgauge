@@ -4,7 +4,8 @@
  * case that proves the diff engine reports zero findings when nothing
  * changed (recordedAt and target metadata are excluded per SPEC §2).
  */
-import { makeServer, type SurfaceDef, type ToolDef } from "./server.ts";
+import type { ProbeDecl } from "snapgauge";
+import { makeEntry, type SurfaceDef, type ToolDef } from "./server.ts";
 
 /** Fresh mutable copies every call — drift fixtures derive from this. */
 export function buildCleanTools(): ToolDef[] {
@@ -23,6 +24,13 @@ export function buildCleanTools(): ToolDef[] {
         additionalProperties: false,
       },
       icons: [{ src: "icons/weather.svg", mimeType: "image/svg+xml", sizes: ["64x64"] }],
+      call: () => ({
+        result: {
+          resultType: "complete",
+          content: [{ type: "text", text: "Sunny, 22°C" }],
+          structuredContent: { location: "Seattle", tempC: 22, conditions: "sunny" },
+        },
+      }),
     },
     {
       name: "archive_note",
@@ -66,7 +74,20 @@ export function buildCleanSurface(): SurfaceDef {
   };
 }
 
-export const cleanV1 = makeServer(buildCleanSurface());
+/**
+ * Declared probes shared by clean@v1 and EVERY derivative (probeSpecHash
+ * must match across a golden pair — SPEC §2 Decision 3). `weather-noargs`
+ * deliberately violates the schema so the captured behavior includes an
+ * errorCode (feeds `error.code.changed` at M3).
+ */
+export function buildCleanProbes(): ProbeDecl[] {
+  return [
+    { id: "weather", tool: "get_weather", arguments: { location: "Seattle" }, capture: "shape" },
+    { id: "weather-noargs", tool: "get_weather", arguments: {}, capture: "shape" },
+  ];
+}
+
+export const cleanV1 = makeEntry(buildCleanSurface(), buildCleanProbes());
 
 /** Same surface, "next release" — must diff to zero findings. */
-export const cleanV2Identical = makeServer(buildCleanSurface());
+export const cleanV2Identical = makeEntry(buildCleanSurface(), buildCleanProbes());

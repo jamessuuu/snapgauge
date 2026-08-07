@@ -3,31 +3,42 @@
  * build a v1 snapshot. Pure core — no clock (recordedAt is injected), no
  * I/O (the transport is the only way out), no process state.
  *
- * M1 probe surface: server/discover + tools/list (3 repeats, SPEC §6:
+ * Probe surface: server/discover + tools/list (3 repeats, SPEC §6:
  * instability becomes data — orderStable — instead of a false breaking
- * finding). Resources/prompts/behavior probes land at M2.
+ * finding) + one tools/call per declared probe (SPEC §2 `behavior`,
+ * shape-captured by default per Decision 1).
  */
-import type { ZodType } from "zod";
 import { SnapgaugeError } from "./errors.js";
-import type { Json } from "./json.js";
-import { JsonRpcResponseSchema } from "./jsonrpc.js";
+import type { Json, JsonObject } from "./json.js";
+import { jcsCanonical } from "./json.js";
 import {
   BUILTIN_VOLATILE_SELECTORS,
   normalizeVolatile,
+  normalizeVolatileKeys,
   probeSpecHash,
+  type ProbeDecl,
   type ProbeSpec,
 } from "./snapshot/canonical.js";
 import {
   FORMAT_VERSION,
   RULESET_VERSION,
   SnapshotV1Schema,
+  type SnapshotBehaviorProbe,
   type SnapshotTarget,
   type SnapshotTool,
   type SnapshotV1,
 } from "./snapshot/schema.js";
+import { shapeOf } from "./snapshot/shape.js";
+import { sha256Hex } from "./sha256.js";
+import { ProbeSession, type RpcExchange } from "./session.js";
 import type { Transport } from "./transport.js";
 import { SNAPGAUGE_VERSION } from "./version.js";
-import { WireDiscoverSchema, WireToolsListSchema, type WireTool } from "./wire.js";
+import {
+  WireDiscoverSchema,
+  WireToolCallResultSchema,
+  WireToolsListSchema,
+  type WireTool,
+} from "./wire.js";
 
 /** 3 repeats per list (SPEC §6): order churn becomes `orderStable: false`. */
 const LIST_REPEATS = 3;
@@ -40,13 +51,32 @@ export interface RecordOptions {
   probeSpec: ProbeSpec;
   /** ISO 8601 — injected; core has no clock. */
   recordedAt: string;
+  /** Sent as `_meta.clientCapabilities` on every tools/call (the revision's
+   * stateless capability declaration). Defaults to none declared. */
+  clientCapabilities?: JsonObject;
   /** Defaults to the build's own version. */
   snapgaugeVersion?: string;
   /** User volatile selectors, merged with the built-in list (SPEC §2). */
   volatile?: readonly string[];
 }
 
-export async function record(options: RecordOptions): Promise<SnapshotV1> {
+/** A probe that failed at the TRANSPORT level (SPEC §6: missing evidence). */
+export interface ProbeFailure {
+  probeId: string;
+  message: string;
+}
+
+export interface RecordOutcome {
+  snapshot: SnapshotV1;
+  /**
+   * Non-empty when a declared probe could not produce evidence (5xx,
+   * timeout, malformed envelope). The gate treats missing evidence as NOT
+   * passing (exit 2), never as "no change" (SPEC §6).
+   */
+  probeFailures: ProbeFailure[];
+}
+
+export async function record(options: RecordOptions): Promise<RecordOutcome> {
   const session = new ProbeSession(options.transport);
 
   const discover = session.parseResult(
@@ -65,6 +95,12 @@ export async function record(options: RecordOptions): Promise<SnapshotV1> {
   const tools = [...first.tools]
     .map(toSnapshotTool)
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+
+  const { behavior, probeFailures } = await runBehaviorProbes(
+    session,
+    options.probeSpec.probes,
+    options.clientCapabilities ?? {},
+  );
 
   const built: unknown = {
     formatVersion: FORMAT_VERSION,
@@ -89,6 +125,7 @@ export async function record(options: RecordOptions): Promise<SnapshotV1> {
       ...(first.cacheScope !== undefined ? { cacheScope: first.cacheScope } : {}),
       orderStable,
     },
+    ...(Object.keys(behavior).length > 0 ? { behavior } : {}),
   };
 
   const userSelectors = options.volatile ?? [];
@@ -108,7 +145,7 @@ export async function record(options: RecordOptions): Promise<SnapshotV1> {
     }
     throw new SnapgaugeError("INTERNAL", `record built an invalid snapshot: ${detail}`);
   }
-  return parsed.data;
+  return { snapshot: parsed.data, probeFailures };
 }
 
 interface ListObservation {
@@ -160,6 +197,91 @@ async function observeToolsList(session: ProbeSession): Promise<ListObservation>
   };
 }
 
+async function runBehaviorProbes(
+  session: ProbeSession,
+  probes: readonly ProbeDecl[],
+  clientCapabilities: JsonObject,
+): Promise<{ behavior: Record<string, SnapshotBehaviorProbe>; probeFailures: ProbeFailure[] }> {
+  const behavior: Record<string, SnapshotBehaviorProbe> = {};
+  const probeFailures: ProbeFailure[] = [];
+  for (const probe of probes) {
+    let exchange: RpcExchange;
+    try {
+      exchange = await session.call("tools/call", {
+        name: probe.tool,
+        arguments: probe.arguments as JsonObject,
+        // The revision's stateless capability declaration: tools/call MUST
+        // carry _meta; clientCapabilities rides on it (SPEC §5 D-group).
+        _meta: { clientCapabilities },
+      });
+    } catch (error) {
+      // SPEC §6: the probe is marked failed, the REMAINING probes still run,
+      // and the caller treats missing evidence as not passing (exit 2).
+      probeFailures.push({
+        probeId: probe.id,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      continue;
+    }
+    behavior[probe.id] = captureBehavior(probe, exchange);
+  }
+  return { behavior, probeFailures };
+}
+
+function captureBehavior(probe: ProbeDecl, exchange: RpcExchange): SnapshotBehaviorProbe {
+  const base = {
+    httpStatus: exchange.status,
+    ...(exchange.contentType !== undefined ? { contentType: exchange.contentType } : {}),
+  };
+  if (exchange.errorCode !== undefined) {
+    return { ...base, isError: true, errorCode: exchange.errorCode };
+  }
+  const parsed = WireToolCallResultSchema.safeParse(exchange.result);
+  if (!parsed.success) {
+    // A non-object result is still observable behavior — capture its shape.
+    return {
+      ...base,
+      isError: false,
+      structuredShape: shapeOf(exchange.result ?? null),
+    };
+  }
+  const result = parsed.data;
+  const values = probe.capture === "values";
+  const capture: SnapshotBehaviorProbe = {
+    ...base,
+    isError: result.isError ?? false,
+  };
+  if (result.resultType !== undefined) capture.resultType = result.resultType;
+  if (result.content !== undefined) {
+    capture.contentBlocks = result.content.map((block) => captureBlock(block, values));
+  }
+  if (result.structuredContent !== undefined) {
+    if (values) {
+      capture.structuredContent = normalizeVolatileKeys(result.structuredContent) as JsonObject;
+    } else {
+      capture.structuredShape = shapeOf(result.structuredContent);
+    }
+  }
+  if (result._meta !== undefined) capture.metaKeys = Object.keys(result._meta).sort();
+  return capture;
+}
+
+function captureBlock(block: Record<string, Json>, values: boolean): Json {
+  // normalizeVolatileKeys preserves Json-ness (it only replaces leaves with
+  // string tokens); the unknown signature exists for pre-validation callers.
+  if (values) return normalizeVolatileKeys(block) as Json;
+  const { type, ...rest } = block;
+  if (type === "text" && typeof rest.text === "string") {
+    // Decision 1: text blocks are stored as {type:"text", sha256} — they
+    // cannot leak customer data out of a tool response.
+    return { type: "text", sha256: sha256Hex(rest.text) };
+  }
+  return {
+    type: typeof type === "string" ? type : jcsCanonical(type),
+    shape: shapeOf(rest),
+  };
+}
+
 function toSnapshotTool(tool: WireTool): SnapshotTool {
   return {
     name: tool.name,
@@ -175,51 +297,4 @@ function toSnapshotTool(tool: WireTool): SnapshotTool {
 
 function sameOrder(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((name, i) => name === b[i]);
-}
-
-class ProbeSession {
-  private nextId = 1;
-
-  constructor(private readonly transport: Transport) {}
-
-  async rpc(method: string, params?: Record<string, Json>): Promise<Json> {
-    let response;
-    try {
-      response = await this.transport.send({
-        jsonrpc: "2.0",
-        id: this.nextId++,
-        method,
-        ...(params !== undefined ? { params } : {}),
-      });
-    } catch (cause) {
-      throw new SnapgaugeError("PROBE_FAILURE", `${method}: transport failure`, { cause });
-    }
-    if (response.status !== 200) {
-      throw new SnapgaugeError("PROBE_FAILURE", `${method}: HTTP ${String(response.status)}`);
-    }
-    const envelope = JsonRpcResponseSchema.safeParse(response.body);
-    if (!envelope.success) {
-      throw new SnapgaugeError("PROBE_FAILURE", `${method}: malformed JSON-RPC envelope`);
-    }
-    if ("error" in envelope.data) {
-      const { code, message } = envelope.data.error;
-      throw new SnapgaugeError(
-        "PROBE_FAILURE",
-        `${method}: server error ${String(code)}: ${message}`,
-      );
-    }
-    return envelope.data.result;
-  }
-
-  parseResult<T>(schema: ZodType<T>, result: Json, method: string): T {
-    const parsed = schema.safeParse(result);
-    if (!parsed.success) {
-      const detail = parsed.error.issues
-        .slice(0, 3)
-        .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
-        .join("; ");
-      throw new SnapgaugeError("PROBE_FAILURE", `${method}: malformed result (${detail})`);
-    }
-    return parsed.data;
-  }
 }

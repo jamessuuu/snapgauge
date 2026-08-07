@@ -221,3 +221,104 @@ describe("snapgauge diff (offline, SPEC §4)", () => {
     expect(err.join("\n")).toContain("upgrade snapgauge");
   });
 });
+
+describe("snapgauge check / ci over config fixture targets (SPEC §4)", () => {
+  function writeFixtureConfig(dir: string, fixture: string): void {
+    const config = { targets: { fix: { transport: "fixture", fixture } } };
+    writeFileSync(join(dir, "snapgauge.config.json"), JSON.stringify(config), "utf8");
+  }
+
+  it("check without a config is a usage error with init guidance", async () => {
+    const dir = tempDir();
+    const { io, err } = capture();
+    expect(await runCli(["check"], io, { cwd: dir, env: {} })).toBe(EXIT.USAGE);
+    expect(err.join("\n")).toContain("snapgauge init");
+  });
+
+  it("check before record names the record command (never writes one itself)", async () => {
+    const dir = tempDir();
+    writeFixtureConfig(dir, "clean@v1");
+    const { io, err } = capture();
+    expect(await runCli(["check", "fix"], io, { cwd: dir, env: {} })).toBe(EXIT.USAGE);
+    expect(err.join("\n")).toContain("snapgauge record fix");
+  });
+
+  it("record + check round-trips a fixture config target (exit 0)", async () => {
+    const dir = tempDir();
+    writeFixtureConfig(dir, "clean@v1");
+    const rec = capture();
+    expect(await runCli(["record", "fix"], rec.io, { cwd: dir, env: {} }), rec.err.join("\n")).toBe(
+      EXIT.CLEAN,
+    );
+    const chk = capture();
+    expect(await runCli(["check"], chk.io, { cwd: dir, env: {} })).toBe(EXIT.CLEAN);
+    expect(chk.out.join("\n")).toContain("below the gate");
+  });
+
+  it("ci alias renders github annotations and fails on the risky gate (SPEC §4)", async () => {
+    const dir = tempDir();
+    writeFixtureConfig(dir, "clean@v1");
+    expect(await runCli(["record", "fix"], capture().io, { cwd: dir, env: {} })).toBe(EXIT.CLEAN);
+    // Point the same target at the drifted fixture — the stored snapshot stays.
+    writeFixtureConfig(dir, "drift-breaking@v2");
+    const { io, out } = capture();
+    const code = await runCli(["ci"], io, { cwd: dir, env: {} });
+    expect(code).toBe(EXIT.DRIFT);
+    const text = out.join("\n");
+    expect(text).toContain("::error title=");
+    expect(text).toContain("tool.removed");
+  });
+
+  it("--ignore drops a rule before gating; --only filters tiers", async () => {
+    const dir = tempDir();
+    writeFixtureConfig(dir, "clean@v1");
+    expect(await runCli(["record", "fix"], capture().io, { cwd: dir, env: {} })).toBe(EXIT.CLEAN);
+    writeFixtureConfig(dir, "drift-cosmetic@v2");
+    const strict = capture();
+    expect(
+      await runCli(["check", "--fail-on", "cosmetic"], strict.io, { cwd: dir, env: {} }),
+    ).toBe(EXIT.DRIFT);
+    const ignored = capture();
+    expect(
+      await runCli(
+        ["check", "--fail-on", "cosmetic", "--ignore", "tool.icons.changed,serverInfo.version.changed"],
+        ignored.io,
+        { cwd: dir, env: {} },
+      ),
+    ).toBe(EXIT.CLEAN);
+    const only = capture();
+    expect(
+      await runCli(
+        ["check", "--fail-on", "cosmetic", "--only", "breaking,risky"],
+        only.io,
+        { cwd: dir, env: {} },
+      ),
+    ).toBe(EXIT.CLEAN);
+  });
+});
+
+describe("snapgauge report (SPEC §4: pure reformat)", () => {
+  it("reformats a saved check result to markdown and exits 0", async () => {
+    const dir = tempDir();
+    const config = { targets: { fix: { transport: "fixture", fixture: "clean@v1" } } };
+    writeFileSync(join(dir, "snapgauge.config.json"), JSON.stringify(config), "utf8");
+    expect(await runCli(["record", "fix"], capture().io, { cwd: dir, env: {} })).toBe(EXIT.CLEAN);
+    const chk = capture();
+    expect(await runCli(["check", "--json"], chk.io, { cwd: dir, env: {} })).toBe(EXIT.CLEAN);
+    const resultFile = join(dir, "result.json");
+    writeFileSync(resultFile, chk.out.join("\n"), "utf8");
+    const rep = capture();
+    expect(await runCli(["report", resultFile, "--format", "md"], rep.io, { cwd: dir, env: {} })).toBe(
+      EXIT.CLEAN,
+    );
+    expect(rep.out.join("\n")).toContain("## snapgauge check — fix");
+  });
+
+  it("rejects a non-result file with a usage error", async () => {
+    const dir = tempDir();
+    const file = join(dir, "not-a-result.json");
+    writeFileSync(file, JSON.stringify({ hello: 1 }), "utf8");
+    const { io } = capture();
+    expect(await runCli(["report", file], io, { cwd: dir, env: {} })).toBe(EXIT.USAGE);
+  });
+});

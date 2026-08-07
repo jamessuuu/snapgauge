@@ -1,0 +1,13 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    // The e2e program pulls in @snapgauge/fixtures sources, which use real
+    // .ts import extensions (consumed by node type stripping, never emitted)
+    // — same arrangement as the root eval program. Living inside test/ makes
+    // this the nearest tsconfig for both tsc and eslint's projectService.
+    "noEmit": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["."]
+}

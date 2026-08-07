@@ -57,7 +57,26 @@ describe("fixture servers", () => {
   });
 
   it("unknown methods return JSON-RPC -32601, not a crash", () => {
-    const response = mustGet("clean@v1")(request("tools/call"), MODERN_FULL);
+    const response = mustGet("clean@v1")(request("snapgauge/no_such"), MODERN_FULL);
     expect(JSON.stringify(response.body)).toContain("-32601");
+  });
+
+  it("tools/call without _meta is -32602 (2026-07-28: _meta is required)", () => {
+    const server = mustGet("clean@v1");
+    const missing = server(
+      { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "get_weather", arguments: { location: "X" } } },
+      MODERN_FULL,
+    );
+    expect(JSON.stringify(missing.body)).toContain("-32602");
+    const present = server(
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: { name: "get_weather", arguments: { location: "X" }, _meta: { clientCapabilities: {} } },
+      },
+      MODERN_FULL,
+    );
+    expect(JSON.stringify(present.body)).toContain('"resultType":"complete"');
   });
 });

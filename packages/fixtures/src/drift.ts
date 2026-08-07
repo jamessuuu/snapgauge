@@ -4,8 +4,8 @@
  * set equality — an accidental extra difference here fails the eval, which
  * is the point.
  */
-import { buildCleanSurface } from "./clean.ts";
-import { makeServer, mustFind, removeTool, type SurfaceDef } from "./server.ts";
+import { buildCleanProbes, buildCleanSurface } from "./clean.ts";
+import { makeEntry, mustFind, removeTool, type SurfaceDef } from "./server.ts";
 
 /**
  * drift-breaking@v2 — one plant per M1 rule, spanning all four tiers:
@@ -48,5 +48,5 @@ function buildDriftCosmeticSurface(): SurfaceDef {
   return surface;
 }
 
-export const driftBreakingV2 = makeServer(buildDriftBreakingSurface());
-export const driftCosmeticV2 = makeServer(buildDriftCosmeticSurface());
+export const driftBreakingV2 = makeEntry(buildDriftBreakingSurface(), buildCleanProbes());
+export const driftCosmeticV2 = makeEntry(buildDriftCosmeticSurface(), buildCleanProbes());

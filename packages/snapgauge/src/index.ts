@@ -6,9 +6,10 @@
  * Vercel function (SPEC §3). The CLI lives behind "snapgauge/bin"; node
  * transports and file I/O land at M2 behind the node side of the boundary.
  *
- * M1 surface (SPEC §10 walking skeleton): snapshot model v1 + canonicalizer,
- * `record`/`diff` over the fixture transport, six diff rules spanning the
- * four tiers, exit-code taxonomy.
+ * Surface: snapshot model v1 + canonicalizer, `record`/`diff`, the diff
+ * rule catalog, transport assertions (T-group) and reporters. Node
+ * transports (http/stdio), config loading and file I/O live behind the
+ * node side of the boundary and are consumed by the CLI.
  */
 export { SNAPGAUGE_VERSION } from "./core/version.js";
 export {
@@ -24,11 +25,36 @@ export type { JsonRpcRequest } from "./core/jsonrpc.js";
 export { MODERN_FULL, getProfile, profileNames, type Profile } from "./core/profile.js";
 export {
   createFixtureTransport,
+  type FixtureRawHandler,
   type FixtureResponse,
   type FixtureServer,
+  type RawHttpRequest,
+  type RawHttpResponse,
   type Transport,
+  type TransportKind,
   type TransportResponse,
 } from "./core/transport.js";
+export {
+  ASSERTION_VERDICTS,
+  AssertionReportSchema,
+  runTransportAssertions,
+  TRANSPORT_ASSERTIONS,
+  type AssertionContext,
+  type AssertionReport,
+  type AssertionVerdict,
+  type TransportAssertion,
+} from "./core/assertions.js";
+export {
+  CheckOutputSchema,
+  parseReportFormat,
+  render,
+  REPORT_FORMATS,
+  summarize,
+  type CheckOutput,
+  type ReportFormat,
+} from "./core/report/report.js";
+export { ProbeSession, type RpcExchange } from "./core/session.js";
+export { shapeOf } from "./core/snapshot/shape.js";
 export {
   FORMAT_VERSION,
   RULESET_VERSION,
@@ -41,11 +67,18 @@ export {
 export {
   BUILTIN_VOLATILE_SELECTORS,
   normalizeVolatile,
+  normalizeVolatileKeys,
   probeSpecHash,
+  VOLATILE_KEYS,
   type ProbeDecl,
   type ProbeSpec,
 } from "./core/snapshot/canonical.js";
-export { record, type RecordOptions } from "./core/probe.js";
+export {
+  record,
+  type ProbeFailure,
+  type RecordOptions,
+  type RecordOutcome,
+} from "./core/probe.js";
 export {
   DiffOutputSchema,
   FindingSchema,

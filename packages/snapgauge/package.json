@@ -40,11 +40,12 @@
   ],
   "sideEffects": false,
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.build.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.build.json --noEmit && tsc -p test/tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "commander": "^14.0.0",
+    "undici": "^7",
     "zod": "^4.0.0"
   },
   "devDependencies": {

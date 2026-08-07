@@ -27,14 +27,62 @@ export function probeSpecHash(spec: ProbeSpec): string {
 }
 
 /**
- * Built-in volatile selectors (SPEC §2 Decision 2: "a fixed built-in list
- * plus user selectors in config"). The built-ins target behavior captures
- * (request ids / timestamps inside structuredShape), which land with the
- * http transport at M2; full volatile handling is an M3 deliverable
- * (SPEC §10). The mechanism below is live now and consumed by `record` for
- * user selectors.
+ * Built-in volatile handling (SPEC §2 Decision 2: "a fixed built-in list
+ * plus user selectors in config") comes in two parts:
+ *
+ * - `BUILTIN_VOLATILE_SELECTORS`: fixed dot-path selectors into the
+ *   snapshot. Empty by design — built-ins cannot be paths because paths
+ *   depend on user-declared probe ids; the built-in list is KEY-based.
+ * - `VOLATILE_KEYS` + `normalizeVolatileKeys`: any object key on the fixed
+ *   list, wherever it appears inside a VALUE capture (contentBlocks /
+ *   structuredContent under `capture:"values"`), is normalized to a type
+ *   token. Shape captures never need this — shapes carry no values.
+ *
+ * User selectors from config are merged with the selector list by `record`.
  */
 export const BUILTIN_VOLATILE_SELECTORS: readonly string[] = [];
+
+/** The fixed built-in list (SPEC §2 Decision 2), lowercase-compared. */
+export const VOLATILE_KEYS: readonly string[] = [
+  "requestid",
+  "request_id",
+  "traceid",
+  "trace_id",
+  "spanid",
+  "span_id",
+  "correlationid",
+  "correlation_id",
+  "timestamp",
+  "generatedat",
+  "generated_at",
+  "servedat",
+  "served_at",
+  "etag",
+  "nonce",
+  "uuid",
+];
+
+const VOLATILE_KEY_SET: ReadonlySet<string> = new Set(VOLATILE_KEYS);
+
+/** Recursively replace values under built-in volatile KEYS with type tokens. */
+export function normalizeVolatileKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((element) => normalizeVolatileKeys(element));
+  if (typeof value === "object" && value !== null) {
+    const record = value as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(record)) {
+      out[key] = VOLATILE_KEY_SET.has(key.toLowerCase())
+        ? volatileToken(record[key])
+        : normalizeVolatileKeys(record[key]);
+    }
+    return out;
+  }
+  return value;
+}
+
+function volatileToken(value: unknown): unknown {
+  return typeToken(value);
+}
 
 const ISO8601_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

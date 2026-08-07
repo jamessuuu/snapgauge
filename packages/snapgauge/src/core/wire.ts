@@ -37,3 +37,25 @@ export const WireToolsListSchema = z.object({
   cacheScope: z.string().optional(),
 });
 export type WireToolsList = z.infer<typeof WireToolsListSchema>;
+
+/** One content block of a tools/call result — `type` is the only fixed key. */
+export const WireContentBlockSchema = z
+  .object({ type: z.string() })
+  .catchall(JsonValueSchema);
+export type WireContentBlock = z.infer<typeof WireContentBlockSchema>;
+
+/**
+ * tools/call result (2026-07-28 revision): `resultType` is REQUIRED by the
+ * revision but the wire schema stays tolerant — its absence is recorded and
+ * becomes the `transport.result_type_absent` finding (M4), never a hidden
+ * parse failure.
+ */
+export const WireToolCallResultSchema = z.object({
+  resultType: z.string().optional(),
+  content: z.array(WireContentBlockSchema).optional(),
+  structuredContent: JsonObjectSchema.optional(),
+  isError: z.boolean().optional(),
+  inputRequests: z.array(JsonValueSchema).optional(),
+  _meta: JsonObjectSchema.optional(),
+});
+export type WireToolCallResult = z.infer<typeof WireToolCallResultSchema>;
