@@ -2,7 +2,10 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node"],
+    // The eval program pulls in @snapgauge/fixtures sources, which use real
+    // .ts import extensions (consumed by node type stripping, never emitted).
+    "allowImportingTsExtensions": true
   },
   "include": ["vitest.config.ts", "evals"]
 }

@@ -11,12 +11,18 @@ importers:
       '@eslint/js':
         specifier: ^9.20.0
         version: 9.39.5
+      '@snapgauge/fixtures':
+        specifier: workspace:*
+        version: link:packages/fixtures
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
       eslint:
         specifier: ^9.20.0
         version: 9.39.5
+      snapgauge:
+        specifier: workspace:*
+        version: link:packages/snapgauge
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -26,10 +32,30 @@ importers:
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3))
+      zod:
+        specifier: ^4.0.0
+        version: 4.4.3
 
   apps/web: {}
 
-  packages/snapgauge: {}
+  packages/fixtures:
+    dependencies:
+      snapgauge:
+        specifier: workspace:*
+        version: link:../snapgauge
+
+  packages/snapgauge:
+    dependencies:
+      commander:
+        specifier: ^14.0.0
+        version: 14.0.3
+      zod:
+        specifier: ^4.0.0
+        version: 4.4.3
+    devDependencies:
+      '@snapgauge/fixtures':
+        specifier: workspace:*
+        version: link:../fixtures
 
 packages:
 
@@ -346,6 +372,10 @@ packages:
 
   color-name@1.1.4:
     resolution: {integrity: sha512-dOy+3AuW3a2wNbZHIuMZpTcgjGuLU/uBL/ubcZF9OXbDo8ff4O8yVp5Bf0efS8uEoYo5q4Fx7dY9OgQGXgAsQA==}
+
+  commander@14.0.3:
+    resolution: {integrity: sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw==}
+    engines: {node: '>=20'}
 
   concat-map@0.0.1:
     resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
@@ -866,6 +896,9 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+
 snapshots:
 
   '@eslint-community/eslint-utils@4.10.1(eslint@9.39.5)':
@@ -1175,6 +1208,8 @@ snapshots:
       color-name: 1.1.4
 
   color-name@1.1.4: {}
+
+  commander@14.0.3: {}
 
   concat-map@0.0.1: {}
 
@@ -1595,3 +1630,5 @@ snapshots:
   word-wrap@1.2.5: {}
 
   yocto-queue@0.1.0: {}
+
+  zod@4.4.3: {}

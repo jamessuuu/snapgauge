@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Fixtures are pure functions (no node imports — they must also run in
+    // the offline demo's Web Worker at M5 and behind a Next route, SPEC §3),
+    // but the typecheck program pulls in snapgauge core sources whose ambient
+    // globals (TextEncoder) resolve via @types/node, so node types stay on.
+    "types": ["node"],
+    // This package never emits — it is consumed as .ts source (vitest, and
+    // plain node ≥24 type stripping for the CLI's fixture transport). Node
+    // does NOT rewrite ".js" specifiers to ".ts", so fixture-internal
+    // imports use real .ts extensions, which requires these two flags.
+    "noEmit": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "breaking-drift-detected",
+  "description": "clean@v1 -> drift-breaking@v2 must produce EXACTLY the six planted findings spanning all four tiers, and fail the default gate (SPEC §7: set-equality scoring — a false positive fails this case).",
+  "fixtureA": "clean@v1",
+  "fixtureB": "drift-breaking@v2",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    { "ruleId": "tool.removed", "tier": "breaking", "subject": "tools.archive_note" },
+    { "ruleId": "tool.input.required.added", "tier": "breaking", "subject": "tools.get_weather.inputSchema.required.date" },
+    { "ruleId": "tool.description.changed", "tier": "risky", "subject": "tools.get_weather.description" },
+    { "ruleId": "tool.input.optional.added", "tier": "compatible", "subject": "tools.list_notes.inputSchema.properties.cursor" },
+    { "ruleId": "tool.icons.changed", "tier": "cosmetic", "subject": "tools.get_weather.icons" },
+    { "ruleId": "serverInfo.version.changed", "tier": "cosmetic", "subject": "discover.serverInfo.version" }
+  ]
+}

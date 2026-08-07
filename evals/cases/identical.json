@@ -1,0 +1,10 @@
+{
+  "name": "identical-surface-zero-findings",
+  "description": "clean@v1 -> clean@v2-identical is the negative pair: an identical observable surface recorded at a different time must yield ZERO findings (recordedAt and target metadata are excluded, SPEC §2) and exit 0.",
+  "fixtureA": "clean@v1",
+  "fixtureB": "clean@v2-identical",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 0,
+  "expectedFindings": []
+}

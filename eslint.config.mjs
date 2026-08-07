@@ -69,6 +69,16 @@ export default tseslint.config(
     },
   },
   {
+    // SHA-256 hot loop: typed-array indexing under noUncheckedIndexedAccess.
+    // Bounds are structurally guaranteed (fixed-size Uint32Array, loop
+    // bounds); per-access guards would be noise. The FIPS vectors + the
+    // node:crypto cross-check in sha256.test.ts are the real safety net.
+    files: ["packages/snapgauge/src/core/sha256.ts"],
+    rules: {
+      "@typescript-eslint/no-non-null-assertion": "off",
+    },
+  },
+  {
     files: ["**/*.mjs", "scripts/**"],
     ...tseslint.configs.disableTypeChecked,
     languageOptions: {

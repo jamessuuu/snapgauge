@@ -1,0 +1,13 @@
+{
+  "name": "cosmetic-only-listed-not-gated",
+  "description": "clean@v1 -> drift-cosmetic@v2: cosmetic-tier drift must be LISTED (both findings reported) but must NOT fail the default risky gate — exit 0 (SPEC §5).",
+  "fixtureA": "clean@v1",
+  "fixtureB": "drift-cosmetic@v2",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 0,
+  "expectedFindings": [
+    { "ruleId": "tool.icons.changed", "tier": "cosmetic", "subject": "tools.get_weather.icons" },
+    { "ruleId": "serverInfo.version.changed", "tier": "cosmetic", "subject": "discover.serverInfo.version" }
+  ]
+}

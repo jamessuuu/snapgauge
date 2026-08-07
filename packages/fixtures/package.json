@@ -1,0 +1,20 @@
+{
+  "name": "@snapgauge/fixtures",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Pure (request, profile) => response fixture MCP servers for the snapgauge eval set and offline demo (SPEC §7). Never published.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "snapgauge": "workspace:*"
+  }
+}
