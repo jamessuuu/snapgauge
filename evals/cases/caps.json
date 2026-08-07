@@ -1,0 +1,31 @@
+{
+  "name": "capabilities-and-versions-churn",
+  "description": "drift-caps@v2: capability removed (breaking) + added (compatible), advertised version dropped (breaking) + added (compatible).",
+  "fixtureA": "clean@v1",
+  "fixtureB": "drift-caps@v2",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "capability.removed",
+      "tier": "breaking",
+      "subject": "discover.capabilities.tools"
+    },
+    {
+      "ruleId": "version.dropped",
+      "tier": "breaking",
+      "subject": "discover.supportedVersions.2026-07-28"
+    },
+    {
+      "ruleId": "capability.added",
+      "tier": "compatible",
+      "subject": "discover.capabilities.resources"
+    },
+    {
+      "ruleId": "version.added",
+      "tier": "compatible",
+      "subject": "discover.supportedVersions.2026-03-26"
+    }
+  ]
+}

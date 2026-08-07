@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeVolatile, probeSpecHash, type ProbeSpec } from "./canonical.js";
+import { normalizeVolatile, normalizeVolatileKeys, probeSpecHash, VOLATILE_KEYS, type ProbeSpec } from "./canonical.js";
 
 describe("probeSpecHash (SPEC §2 Decision 3)", () => {
   const spec: ProbeSpec = { probes: [], profiles: ["modern-full"] };
@@ -79,5 +79,35 @@ describe("normalizeVolatile (SPEC §2 Decision 2)", () => {
     const input = { a: { b: 1 } };
     expect(normalizeVolatile(input, [])).toBe(input);
     expect(normalizeVolatile(input, ["does.not.match"])).toBe(input);
+  });
+});
+
+describe("built-in volatile KEYS (SPEC §2 Decision 2: the fixed built-in list)", () => {
+  it("tokenizes values under built-in keys anywhere in a value capture", () => {
+    const input = {
+      requestId: "9f1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d",
+      nested: { TIMESTAMP: "2026-08-08T10:00:00Z", items: [{ etag: "abc", keep: "me" }] },
+    };
+    expect(normalizeVolatileKeys(input)).toEqual({
+      requestId: "<uuid>",
+      nested: { TIMESTAMP: "<iso8601>", items: [{ etag: "<string>", keep: "me" }] },
+    });
+  });
+
+  it("matches case-insensitively and leaves non-volatile keys alone", () => {
+    expect(normalizeVolatileKeys({ Request_Id: "x", body: "y" })).toEqual({
+      Request_Id: "<string>",
+      body: "y",
+    });
+  });
+
+  it("the built-in list is fixed, lowercase and non-empty", () => {
+    expect(VOLATILE_KEYS.length).toBeGreaterThan(0);
+    for (const key of VOLATILE_KEYS) expect(key).toBe(key.toLowerCase());
+  });
+
+  it("scalars and arrays pass through untouched", () => {
+    expect(normalizeVolatileKeys("plain")).toBe("plain");
+    expect(normalizeVolatileKeys([1, 2])).toEqual([1, 2]);
   });
 });

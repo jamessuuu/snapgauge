@@ -78,6 +78,7 @@ interface RecordCommandOptions {
 interface DiffCommandOptions {
   failOn: string;
   json?: boolean;
+  migrate?: boolean;
 }
 
 interface CheckCommandOptions {
@@ -92,6 +93,7 @@ interface CheckCommandOptions {
   update?: boolean;
   recordedAt?: string;
   summary?: boolean;
+  migrate?: boolean;
 }
 
 interface InitCommandOptions {
@@ -170,6 +172,7 @@ export async function runCli(
     .option("--json", "shorthand for --reporter json")
     .option("--update", "rewrite the stored snapshot from the live probe")
     .option("--recorded-at <iso8601>", "pin recordedAt (reproducible snapshots)")
+    .option("--migrate", "upgrade an older-formatVersion stored snapshot in place (SPEC §2 Decision 3)")
     .action(async (target: string | undefined, options: CheckCommandOptions) => {
       code = await checkCommand(target, options, io, ctx);
     });
@@ -197,6 +200,7 @@ export async function runCli(
     .argument("<b>", "new snapshot file")
     .option("--fail-on <tier>", `gate tier (${TIERS.join("|")})`, "risky")
     .option("--json", "print the diff result as JSON")
+    .option("--migrate", "upgrade older-formatVersion snapshot files in place (SPEC §2 Decision 3)")
     .action((a: string, b: string, options: DiffCommandOptions) => {
       code = diffCommand(a, b, options, io);
     });
@@ -350,7 +354,7 @@ async function checkCommand(
         `no stored snapshot at ${storedFile} — run \`snapgauge record ${name}\` first (check never writes one, SPEC §4)`,
       );
     }
-    const stored = readSnapshotFile(storedFile);
+    const stored = readSnapshotFile(storedFile, { migrate: options.migrate === true });
     const live = await buildLiveTarget(targetConfig, {
       strictNet: options.strictNet,
       timeoutMs: parseTimeout(options.timeout),
@@ -443,8 +447,9 @@ function filterFindings(
 function diffCommand(a: string, b: string, options: DiffCommandOptions, io: CliIo): ExitCode {
   try {
     const failOn = parseTier(options.failOn);
-    const snapshotA = readSnapshotFile(a);
-    const snapshotB = readSnapshotFile(b);
+    const migrate = options.migrate === true;
+    const snapshotA = readSnapshotFile(a, { migrate });
+    const snapshotB = readSnapshotFile(b, { migrate });
     const result = diffSnapshots(snapshotA, snapshotB);
     const failed = gateFailed(result, failOn);
     const output: DiffOutput = {

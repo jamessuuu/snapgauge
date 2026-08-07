@@ -1,0 +1,21 @@
+{
+  "name": "cosmetic-drift-reversed-still-cosmetic",
+  "description": "Reversed cosmetic pair: icons and serverInfo.version changes are symmetric cosmetics; exit 0 at the default gate.",
+  "fixtureA": "drift-cosmetic@v2",
+  "fixtureB": "clean@v1",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 0,
+  "expectedFindings": [
+    {
+      "ruleId": "tool.icons.changed",
+      "tier": "cosmetic",
+      "subject": "tools.get_weather.icons"
+    },
+    {
+      "ruleId": "serverInfo.version.changed",
+      "tier": "cosmetic",
+      "subject": "discover.serverInfo.version"
+    }
+  ]
+}

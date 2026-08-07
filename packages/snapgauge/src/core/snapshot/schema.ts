@@ -15,11 +15,11 @@ import { JsonObjectSchema, JsonValueSchema } from "../json.js";
 export const FORMAT_VERSION = 1;
 
 /**
- * Version of the diff-rule catalog baked into this build. M1 ships six rules
- * spanning the four tiers (SPEC §10); the full §5 taxonomy lands at M3 and
- * bumps this.
+ * Version of the diff-rule catalog baked into this build.
+ * 1 = the six M1 walking-skeleton rules; 2 = the full SPEC §5 tier-table
+ * taxonomy (M3).
  */
-export const RULESET_VERSION = 1;
+export const RULESET_VERSION = 2;
 
 const Sha256HexSchema = z.string().regex(/^[0-9a-f]{64}$/, "sha-256 hex");
 const Iso8601Schema = z

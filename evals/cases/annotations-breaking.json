@@ -1,0 +1,26 @@
+{
+  "name": "annotation-safety-revocations",
+  "description": "drift-annotations-breaking@v2: readOnlyHint revoked, idempotentHint revoked, destructiveHint raised - three breaking findings, nothing else.",
+  "fixtureA": "clean@v1",
+  "fixtureB": "drift-annotations-breaking@v2",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "annotation.idempotentHint.revoked",
+      "tier": "breaking",
+      "subject": "tools.archive_note.annotations.idempotentHint"
+    },
+    {
+      "ruleId": "annotation.readOnlyHint.revoked",
+      "tier": "breaking",
+      "subject": "tools.list_notes.annotations.readOnlyHint"
+    },
+    {
+      "ruleId": "annotation.destructiveHint.raised",
+      "tier": "breaking",
+      "subject": "tools.get_weather.annotations.destructiveHint"
+    }
+  ]
+}

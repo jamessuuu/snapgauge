@@ -1,0 +1,16 @@
+{
+  "name": "stable-reorder-is-risky-not-breaking",
+  "description": "drift-order@v2: same tool set, stable but different order - order.changed (risky, prompt-cache churn), and NO schema findings because the body sorts tools by name (SPEC 2 Decision 2).",
+  "fixtureA": "clean@v1",
+  "fixtureB": "drift-order@v2",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "order.changed",
+      "tier": "risky",
+      "subject": "toolsList.order"
+    }
+  ]
+}

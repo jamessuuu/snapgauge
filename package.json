@@ -13,6 +13,7 @@
     "test": "vitest run",
     "build": "pnpm -r build",
     "eval": "vitest run --project eval",
+    "docs:rules": "pnpm --filter snapgauge build && node scripts/generate-rules.mjs",
     "ci:pack-check": "node scripts/pack-check.mjs"
   },
   "devDependencies": {

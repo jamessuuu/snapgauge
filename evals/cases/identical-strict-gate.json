@@ -1,0 +1,10 @@
+{
+  "name": "identical-surface-survives-the-strictest-gate",
+  "description": "clean@v1 -> clean@v2-identical under failOn=cosmetic: still ZERO findings - the false-positive bar holds at the strictest gate.",
+  "fixtureA": "clean@v1",
+  "fixtureB": "clean@v2-identical",
+  "profile": "modern-full",
+  "failOn": "cosmetic",
+  "expectedExit": 0,
+  "expectedFindings": []
+}

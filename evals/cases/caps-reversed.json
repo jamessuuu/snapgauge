@@ -1,0 +1,31 @@
+{
+  "name": "capabilities-and-versions-churn-reversed",
+  "description": "Reversed caps pair: the mirror image, proving the four rules are direction-aware.",
+  "fixtureA": "drift-caps@v2",
+  "fixtureB": "clean@v1",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "capability.removed",
+      "tier": "breaking",
+      "subject": "discover.capabilities.resources"
+    },
+    {
+      "ruleId": "version.dropped",
+      "tier": "breaking",
+      "subject": "discover.supportedVersions.2026-03-26"
+    },
+    {
+      "ruleId": "capability.added",
+      "tier": "compatible",
+      "subject": "discover.capabilities.tools"
+    },
+    {
+      "ruleId": "version.added",
+      "tier": "compatible",
+      "subject": "discover.supportedVersions.2026-07-28"
+    }
+  ]
+}

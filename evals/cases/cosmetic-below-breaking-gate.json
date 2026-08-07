@@ -1,0 +1,21 @@
+{
+  "name": "cosmetic-findings-pass-a-breaking-gate",
+  "description": "The cosmetic pair with failOn=breaking exits 0 - gate tiers are ordered.",
+  "fixtureA": "clean@v1",
+  "fixtureB": "drift-cosmetic@v2",
+  "profile": "modern-full",
+  "failOn": "breaking",
+  "expectedExit": 0,
+  "expectedFindings": [
+    {
+      "ruleId": "tool.icons.changed",
+      "tier": "cosmetic",
+      "subject": "tools.get_weather.icons"
+    },
+    {
+      "ruleId": "serverInfo.version.changed",
+      "tier": "cosmetic",
+      "subject": "discover.serverInfo.version"
+    }
+  ]
+}

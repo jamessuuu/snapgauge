@@ -1,0 +1,26 @@
+{
+  "name": "annotation-revocations-reversed-are-relaxed",
+  "description": "The same annotation pair reversed lands entirely in the annotation.*.relaxed family (risky) - increased safety claims, not breakage.",
+  "fixtureA": "drift-annotations-breaking@v2",
+  "fixtureB": "clean@v1",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "annotation.idempotentHint.relaxed",
+      "tier": "risky",
+      "subject": "tools.archive_note.annotations.idempotentHint"
+    },
+    {
+      "ruleId": "annotation.readOnlyHint.relaxed",
+      "tier": "risky",
+      "subject": "tools.list_notes.annotations.readOnlyHint"
+    },
+    {
+      "ruleId": "annotation.destructiveHint.relaxed",
+      "tier": "risky",
+      "subject": "tools.get_weather.annotations.destructiveHint"
+    }
+  ]
+}

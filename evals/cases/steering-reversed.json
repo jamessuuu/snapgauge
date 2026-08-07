@@ -1,0 +1,21 @@
+{
+  "name": "steering-reversed-relaxed-direction",
+  "description": "Reversed steering pair: the same hint flip in the other direction is the annotation.*.relaxed family (risky), proving direction-awareness.",
+  "fixtureA": "drift-steering@v2",
+  "fixtureB": "clean@v1",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "annotation.readOnlyHint.relaxed",
+      "tier": "risky",
+      "subject": "tools.list_notes.annotations.readOnlyHint"
+    },
+    {
+      "ruleId": "tool.description.changed",
+      "tier": "risky",
+      "subject": "tools.list_notes.description"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "annotation-safety-claims-increased",
+  "description": "drift-annotations-relaxed@v2: destructiveHint withdrawn, readOnlyHint granted, idempotentHint granted - the annotation.*.relaxed family, all risky.",
+  "fixtureA": "clean@v1",
+  "fixtureB": "drift-annotations-relaxed@v2",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "annotation.destructiveHint.relaxed",
+      "tier": "risky",
+      "subject": "tools.archive_note.annotations.destructiveHint"
+    },
+    {
+      "ruleId": "annotation.readOnlyHint.relaxed",
+      "tier": "risky",
+      "subject": "tools.get_weather.annotations.readOnlyHint"
+    },
+    {
+      "ruleId": "annotation.idempotentHint.relaxed",
+      "tier": "risky",
+      "subject": "tools.get_weather.annotations.idempotentHint"
+    }
+  ]
+}

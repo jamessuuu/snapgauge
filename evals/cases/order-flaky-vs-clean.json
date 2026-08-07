@@ -1,0 +1,16 @@
+{
+  "name": "flaky-order-against-clean-baseline",
+  "description": "clean -> flaky-order: the unstable side suppresses order.changed; the only finding is the instability itself. No tool.removed despite the shuffled wire order.",
+  "fixtureA": "clean@v1",
+  "fixtureB": "flaky-order",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "order.nondeterministic",
+      "tier": "risky",
+      "subject": "toolsList.order"
+    }
+  ]
+}

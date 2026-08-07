@@ -1,7 +1,6 @@
 /**
- * The diff engine + the M1 rule catalog (SPEC §5, §10): six rules spanning
- * all four tiers, direction-aware (old → new). The full taxonomy lands at
- * M3 and bumps RULESET_VERSION.
+ * The diff engine (SPEC §5): runs the full rule catalog (rules.ts),
+ * direction-aware (old → new), and gates on tier.
  *
  * recordedAt, target metadata and snapgaugeVersion are excluded from every
  * diff by construction — no rule reads them (SPEC §2 Decision 2; proven by
@@ -9,8 +8,9 @@
  */
 import { z } from "zod";
 import { SnapgaugeError } from "../errors.js";
-import { jcsCanonical, JsonValueSchema, type Json } from "../json.js";
-import type { SnapshotTool, SnapshotV1 } from "../snapshot/schema.js";
+import { JsonValueSchema } from "../json.js";
+import type { SnapshotV1 } from "../snapshot/schema.js";
+import { RULES } from "./rules.js";
 
 /** Ascending severity; index = rank. */
 export const TIERS = ["cosmetic", "compatible", "risky", "breaking"] as const;
@@ -57,105 +57,6 @@ export const DiffOutputSchema = z.strictObject({
 });
 export type DiffOutput = z.infer<typeof DiffOutputSchema>;
 
-type PartialFinding = Omit<Finding, "ruleId" | "tier">;
-
-interface Rule {
-  id: string;
-  tier: Tier;
-  run(a: SnapshotV1, b: SnapshotV1): PartialFinding[];
-}
-
-/**
- * M1 rule catalog (SPEC §10: "6 rules"). Tier rationale is SPEC §5's —
- * notably descriptions are risky, NOT cosmetic: description text is the
- * trigger surface a model routes on.
- */
-const RULES: readonly Rule[] = [
-  {
-    id: "tool.removed",
-    tier: "breaking",
-    run: (a, b) => {
-      const after = toolMap(b);
-      return a.tools
-        .filter((tool) => !after.has(tool.name))
-        .map((tool) => ({
-          subject: `tools.${tool.name}`,
-          message: `tool "${tool.name}" was removed — a client holding the old contract will fail`,
-        }));
-    },
-  },
-  {
-    id: "tool.input.required.added",
-    tier: "breaking",
-    run: (a, b) =>
-      commonTools(a, b).flatMap(([oldTool, newTool]) => {
-        const oldRequired = requiredNames(oldTool);
-        return [...requiredNames(newTool)]
-          .filter((name) => !oldRequired.has(name))
-          .map((name) => ({
-            subject: `tools.${newTool.name}.inputSchema.required.${name}`,
-            message: `input "${name}" is now required — a client recorded against the old contract does not send it`,
-          }));
-      }),
-  },
-  {
-    id: "tool.description.changed",
-    tier: "risky",
-    run: (a, b) =>
-      commonTools(a, b)
-        .filter(([oldTool, newTool]) => oldTool.description !== newTool.description)
-        .map(([oldTool, newTool]) => ({
-          subject: `tools.${newTool.name}.description`,
-          message: `description changed — the trigger surface a model routes on (SPEC §5: risky, not cosmetic)`,
-          ...(oldTool.description !== undefined ? { before: oldTool.description } : {}),
-          ...(newTool.description !== undefined ? { after: newTool.description } : {}),
-        })),
-  },
-  {
-    id: "tool.input.optional.added",
-    tier: "compatible",
-    run: (a, b) =>
-      commonTools(a, b).flatMap(([oldTool, newTool]) => {
-        const oldProps = propertyNames(oldTool);
-        const newRequired = requiredNames(newTool);
-        return [...propertyNames(newTool)]
-          .filter((name) => !oldProps.has(name) && !newRequired.has(name))
-          .map((name) => ({
-            subject: `tools.${newTool.name}.inputSchema.properties.${name}`,
-            message: `optional input "${name}" was added`,
-          }));
-      }),
-  },
-  {
-    id: "tool.icons.changed",
-    tier: "cosmetic",
-    run: (a, b) =>
-      commonTools(a, b)
-        .filter(([oldTool, newTool]) => !jsonEqual(oldTool.icons, newTool.icons))
-        .map(([, newTool]) => ({
-          subject: `tools.${newTool.name}.icons`,
-          message: "icons changed",
-        })),
-  },
-  {
-    id: "serverInfo.version.changed",
-    tier: "cosmetic",
-    run: (a, b) => {
-      const before = a.discover.serverInfo.version;
-      const after = b.discover.serverInfo.version;
-      if (before === after) return [];
-      return [
-        {
-          subject: "discover.serverInfo.version",
-          message: "serverInfo.version changed",
-          before,
-          after,
-        },
-      ];
-    },
-  },
-];
-
 export function diffSnapshots(a: SnapshotV1, b: SnapshotV1): DiffResult {
   if (a.probeSpecHash !== b.probeSpecHash) {
     throw new SnapgaugeError(
@@ -184,39 +85,6 @@ export function diffSnapshots(a: SnapshotV1, b: SnapshotV1): DiffResult {
 export function gateFailed(result: DiffResult, failOn: Tier): boolean {
   const minimum = tierRank(failOn);
   return result.findings.some((finding) => tierRank(finding.tier) >= minimum);
-}
-
-function toolMap(snapshot: SnapshotV1): Map<string, SnapshotTool> {
-  return new Map(snapshot.tools.map((tool) => [tool.name, tool]));
-}
-
-function commonTools(a: SnapshotV1, b: SnapshotV1): [SnapshotTool, SnapshotTool][] {
-  const after = toolMap(b);
-  const pairs: [SnapshotTool, SnapshotTool][] = [];
-  for (const tool of a.tools) {
-    const counterpart = after.get(tool.name);
-    if (counterpart !== undefined) pairs.push([tool, counterpart]);
-  }
-  return pairs;
-}
-
-function requiredNames(tool: SnapshotTool): ReadonlySet<string> {
-  const required = tool.inputSchema.required;
-  if (!Array.isArray(required)) return new Set();
-  return new Set(required.filter((entry): entry is string => typeof entry === "string"));
-}
-
-function propertyNames(tool: SnapshotTool): ReadonlySet<string> {
-  const properties = tool.inputSchema.properties;
-  if (properties === null || typeof properties !== "object" || Array.isArray(properties)) {
-    return new Set();
-  }
-  return new Set(Object.keys(properties));
-}
-
-function jsonEqual(a: Json | undefined, b: Json | undefined): boolean {
-  if (a === undefined || b === undefined) return a === b;
-  return jcsCanonical(a) === jcsCanonical(b);
 }
 
 function compareStrings(a: string, b: string): number {

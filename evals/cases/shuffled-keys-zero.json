@@ -1,0 +1,10 @@
+{
+  "name": "wire-key-order-is-not-drift",
+  "description": "clean@v1 vs clean@v1-shuffled (identical data, scrambled JSON key order on the wire): canonicalization erases serialization noise - ZERO findings (false-positive guard).",
+  "fixtureA": "clean@v1",
+  "fixtureB": "clean@v1-shuffled",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 0,
+  "expectedFindings": []
+}

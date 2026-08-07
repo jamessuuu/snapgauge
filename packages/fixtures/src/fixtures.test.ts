@@ -13,12 +13,25 @@ function mustGet(name: string) {
 }
 
 describe("fixture registry (SPEC §7)", () => {
-  it("resolves the M1 roster and nothing else", () => {
+  it("resolves the M3 roster and nothing else", () => {
     expect(fixtureNames()).toEqual([
       "clean@v1",
+      "clean@v1-shuffled",
       "clean@v2-identical",
+      "drift-annotations-breaking@v2",
+      "drift-annotations-relaxed@v2",
       "drift-breaking@v2",
+      "drift-cache@v2",
+      "drift-caps@v2",
       "drift-cosmetic@v2",
+      "drift-error-code@v2",
+      "drift-instructions@v2",
+      "drift-meta@v2",
+      "drift-order@v2",
+      "drift-schema@v2",
+      "drift-steering@v2",
+      "drift-xhdr@v2",
+      "flaky-order",
     ]);
     expect(getFixture("nope@v1")).toBeUndefined();
     // Prototype keys must not resolve to Object.prototype members.

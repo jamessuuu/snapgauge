@@ -6,6 +6,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: se
 ## [Unreleased]
 
 ### Added
+- M3 (full diff taxonomy, SPEC §10): every rule id in the SPEC §5 tier
+  table implemented in a metadata-carrying registry (36 rules: 13 breaking
+  + the annotation.*.relaxed family at risky + 8 compatible + 4 cosmetic),
+  direction-aware with recursive schema walks (nested `properties`), enum
+  set semantics (introduced = narrowed, dropped = widened), x-mcp-header
+  binding diffs (xhdr.added / xhdr.changed), behavior-probe error.code
+  comparison, cache-hint rules on discover + toolsList, whitespace-only
+  text demoted to cosmetic; docs/RULES.md generated from the registry
+  (`pnpm docs:rules`) with a byte-equality drift-guard test; order rules —
+  order.changed (stable reorder, risky) and order.nondeterministic (3-repeat
+  instability, risky, NEVER a false breaking); snapshot formatVersion
+  migration scaffold (forward-only pure functions, purity+chain-gap+stamp
+  enforcement, applied on `--migrate` only — diff and check gained the
+  flag); built-in volatile-key list finalized and unit-covered; ten new
+  planted drift fixtures + flaky-order (seeded shuffle) + clean@v1-shuffled
+  (scrambled wire key order); golden set grown to 30 cases at 100% exact
+  match, plus the false-positive suite (clean→clean under every registered
+  profile), the stability eval (record twice → byte-identical) and the
+  determinism eval (shuffled key order → identical snapshot).
+  RULESET_VERSION bumped to 2.
 - M2 (transports + check, SPEC §10): `http` transport over undici with the
   one-implementation address policy (SPEC §3 Decision 4 — DNS resolve, full
   RFC1918/loopback/link-local/CGNAT/IPv6-ULA-and-mapped/metadata block list,

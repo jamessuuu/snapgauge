@@ -1,0 +1,36 @@
+{
+  "name": "breaking-drift-reversed-is-mostly-benign",
+  "description": "drift-breaking@v2 -> clean@v1: the reverse of a breaking release is an added tool (risky), a de-required input (compatible) and cosmetics - direction-awareness on the M1 pair.",
+  "fixtureA": "drift-breaking@v2",
+  "fixtureB": "clean@v1",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "tool.added",
+      "tier": "risky",
+      "subject": "tools.archive_note"
+    },
+    {
+      "ruleId": "tool.description.changed",
+      "tier": "risky",
+      "subject": "tools.get_weather.description"
+    },
+    {
+      "ruleId": "required.removed",
+      "tier": "compatible",
+      "subject": "tools.get_weather.inputSchema.required.date"
+    },
+    {
+      "ruleId": "tool.icons.changed",
+      "tier": "cosmetic",
+      "subject": "tools.get_weather.icons"
+    },
+    {
+      "ruleId": "serverInfo.version.changed",
+      "tier": "cosmetic",
+      "subject": "discover.serverInfo.version"
+    }
+  ]
+}

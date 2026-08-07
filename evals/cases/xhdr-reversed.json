@@ -1,0 +1,16 @@
+{
+  "name": "x-mcp-header-reversed-removal-is-silent",
+  "description": "Reversed xhdr pair: the changed binding still fires; a REMOVED binding has no rule (clients that stop sending a header lose nothing).",
+  "fixtureA": "drift-xhdr@v2",
+  "fixtureB": "clean@v1",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "xhdr.changed",
+      "tier": "breaking",
+      "subject": "tools.archive_note.inputSchema.properties.workspace.x-mcp-header"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "risky-findings-pass-a-breaking-gate",
+  "description": "The same risky-only pair with failOn=breaking exits 0: the findings are listed but sit below the gate.",
+  "fixtureA": "clean@v1",
+  "fixtureB": "drift-instructions@v2",
+  "profile": "modern-full",
+  "failOn": "breaking",
+  "expectedExit": 0,
+  "expectedFindings": [
+    {
+      "ruleId": "instructions.changed",
+      "tier": "risky",
+      "subject": "discover.instructions"
+    },
+    {
+      "ruleId": "tool.title.changed",
+      "tier": "risky",
+      "subject": "tools.get_weather.title"
+    },
+    {
+      "ruleId": "tool.added",
+      "tier": "risky",
+      "subject": "tools.delete_note"
+    }
+  ]
+}

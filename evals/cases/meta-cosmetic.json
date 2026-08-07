@@ -1,0 +1,21 @@
+{
+  "name": "vendor-meta-and-whitespace-only",
+  "description": "drift-meta@v2: vendor _meta churn and a whitespace-only description edit are the two COSMETIC text-adjacent cases - listed, exit 0 at the default gate.",
+  "fixtureA": "clean@v1",
+  "fixtureB": "drift-meta@v2",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 0,
+  "expectedFindings": [
+    {
+      "ruleId": "_meta.vendor.changed",
+      "tier": "cosmetic",
+      "subject": "tools.get_weather._meta"
+    },
+    {
+      "ruleId": "text.whitespace-only",
+      "tier": "cosmetic",
+      "subject": "tools.archive_note.description"
+    }
+  ]
+}

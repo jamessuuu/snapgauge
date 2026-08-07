@@ -1,0 +1,21 @@
+{
+  "name": "vendor-meta-whitespace-gated-at-cosmetic",
+  "description": "The same cosmetic pair with failOn=cosmetic must gate (exit 1) - the strictest gate catches everything.",
+  "fixtureA": "clean@v1",
+  "fixtureB": "drift-meta@v2",
+  "profile": "modern-full",
+  "failOn": "cosmetic",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "_meta.vendor.changed",
+      "tier": "cosmetic",
+      "subject": "tools.get_weather._meta"
+    },
+    {
+      "ruleId": "text.whitespace-only",
+      "tier": "cosmetic",
+      "subject": "tools.archive_note.description"
+    }
+  ]
+}

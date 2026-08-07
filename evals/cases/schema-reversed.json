@@ -1,0 +1,36 @@
+{
+  "name": "schema-drift-reversed-direction-awareness",
+  "description": "The same schema pair reversed: widened becomes narrowed, removed becomes added, disjoint type changes are narrowed in BOTH directions, and output-relaxations have no rule.",
+  "fixtureA": "drift-schema@v2",
+  "fixtureB": "clean@v1",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "tool.input.enum.removed",
+      "tier": "breaking",
+      "subject": "tools.get_weather.inputSchema.properties.units.enum"
+    },
+    {
+      "ruleId": "tool.input.enum.added",
+      "tier": "compatible",
+      "subject": "tools.get_weather.inputSchema.properties.units.enum"
+    },
+    {
+      "ruleId": "tool.input.type.narrowed",
+      "tier": "breaking",
+      "subject": "tools.list_notes.inputSchema.properties.limit.type"
+    },
+    {
+      "ruleId": "tool.input.type.narrowed",
+      "tier": "breaking",
+      "subject": "tools.get_weather.inputSchema.properties.location.type"
+    },
+    {
+      "ruleId": "tool.input.required.added",
+      "tier": "breaking",
+      "subject": "tools.get_weather.inputSchema.required.location"
+    }
+  ]
+}

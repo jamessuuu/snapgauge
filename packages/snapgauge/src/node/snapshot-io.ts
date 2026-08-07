@@ -8,9 +8,25 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { SnapgaugeError } from "../core/errors.js";
 import { canonicalStringify } from "../core/json.js";
+import {
+  migrateSnapshotDocument,
+  MIGRATIONS,
+  type SnapshotMigration,
+} from "../core/snapshot/migrations/index.js";
 import { FORMAT_VERSION, SnapshotV1Schema, type SnapshotV1 } from "../core/snapshot/schema.js";
 
-export function readSnapshotFile(path: string): SnapshotV1 {
+export interface ReadSnapshotOptions {
+  /**
+   * SPEC §2 Decision 3: older formats are migrated through forward-only pure
+   * functions on `--migrate` ONLY — the file is rewritten in place; without
+   * it an older file is a targeted exit-4 refusal.
+   */
+  migrate?: boolean;
+  /** Injectable for tests; production uses the real registry. */
+  migrations?: readonly SnapshotMigration[];
+}
+
+export function readSnapshotFile(path: string, options?: ReadSnapshotOptions): SnapshotV1 {
   let raw: string;
   try {
     raw = readFileSync(path, "utf8");
@@ -32,6 +48,24 @@ export function readSnapshotFile(path: string): SnapshotV1 {
         "SNAPSHOT_FORMAT_NEWER",
         `${path} has formatVersion ${String(formatVersion)}; this snapgauge reads up to ${String(FORMAT_VERSION)} — upgrade snapgauge`,
       );
+    }
+    if (typeof formatVersion === "number" && formatVersion < FORMAT_VERSION) {
+      if (options?.migrate !== true) {
+        throw new SnapgaugeError(
+          "SNAPSHOT_FORMAT",
+          `${path} has formatVersion ${String(formatVersion)}; this snapgauge writes ${String(FORMAT_VERSION)} — re-run with --migrate to upgrade the file in place (SPEC §2 Decision 3: never rewritten without it)`,
+        );
+      }
+      const outcome = migrateSnapshotDocument(parsed, options.migrations ?? MIGRATIONS);
+      const migrated = SnapshotV1Schema.safeParse(outcome.document);
+      if (!migrated.success) {
+        throw new SnapgaugeError(
+          "SNAPSHOT_FORMAT",
+          `${path} did not migrate to a valid v${String(FORMAT_VERSION)} snapshot (steps: ${outcome.applied.join(", ") || "none"})`,
+        );
+      }
+      writeSnapshotFileAtomic(path, migrated.data);
+      return migrated.data;
     }
   }
   const result = SnapshotV1Schema.safeParse(parsed);

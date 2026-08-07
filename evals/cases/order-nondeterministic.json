@@ -1,0 +1,16 @@
+{
+  "name": "flaky-order-is-instability-never-breaking",
+  "description": "flaky-order (seeded shuffle): the 3-repeat probe records orderStable:false; the diff reports order.nondeterministic (risky) and NEVER a false breaking finding (SPEC 6).",
+  "fixtureA": "flaky-order",
+  "fixtureB": "flaky-order",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "order.nondeterministic",
+      "tier": "risky",
+      "subject": "toolsList.order"
+    }
+  ]
+}

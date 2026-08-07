@@ -61,6 +61,11 @@ export type SurfaceDef = {
   cacheScope: string;
   /** Array order = observed tools/list order. */
   tools: ToolDef[];
+  /**
+   * Error code for failed required-argument validation; default -32602.
+   * drift-error-code@v2 overrides it (SPEC §5 error.code.changed).
+   */
+  validationErrorCode?: number;
 };
 
 /** A registry entry: the server plus its declared probes and raw framing. */
@@ -117,7 +122,11 @@ function handleToolCall(
   const args = isObject(params.arguments) ? params.arguments : {};
   for (const required of tool.inputSchema.required ?? []) {
     if (!(required in args)) {
-      return rpcError(request, -32602, `missing required argument: ${required}`);
+      return rpcError(
+        request,
+        surface.validationErrorCode ?? -32602,
+        `missing required argument: ${required}`,
+      );
     }
   }
   const outcome: ToolCallOutcome =

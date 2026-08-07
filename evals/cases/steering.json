@@ -1,0 +1,21 @@
+{
+  "name": "steering-drift-description-and-readonly-flip",
+  "description": "drift-steering@v2 (SPEC 7): a description rewrite is RISKY (trigger surface) and a readOnlyHint flip true->false is BREAKING - exactly these two findings.",
+  "fixtureA": "clean@v1",
+  "fixtureB": "drift-steering@v2",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "annotation.readOnlyHint.revoked",
+      "tier": "breaking",
+      "subject": "tools.list_notes.annotations.readOnlyHint"
+    },
+    {
+      "ruleId": "tool.description.changed",
+      "tier": "risky",
+      "subject": "tools.list_notes.description"
+    }
+  ]
+}

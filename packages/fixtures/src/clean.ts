@@ -23,7 +23,17 @@ export function buildCleanTools(): ToolDef[] {
         required: ["location"],
         additionalProperties: false,
       },
+      outputSchema: {
+        type: "object",
+        properties: {
+          tempC: { type: "number" },
+          conditions: { type: "string", enum: ["sunny", "rain"] },
+        },
+        required: ["tempC"],
+        additionalProperties: false,
+      },
       icons: [{ src: "icons/weather.svg", mimeType: "image/svg+xml", sizes: ["64x64"] }],
+      _meta: { "vendor/build": "1" },
       call: () => ({
         result: {
           resultType: "complete",
@@ -39,11 +49,16 @@ export function buildCleanTools(): ToolDef[] {
         type: "object",
         properties: {
           id: { type: "string", description: "Note id" },
+          // A valid x-mcp-header binding: statically reachable through
+          // `properties`, token header name, string type, unique (SPEC §5
+          // X-group — the negative case; violations live in
+          // bad-x-mcp-header at M4).
+          workspace: { type: "string", description: "Workspace slug", "x-mcp-header": "X-Workspace" },
         },
         required: ["id"],
         additionalProperties: false,
       },
-      annotations: { idempotentHint: true },
+      annotations: { idempotentHint: true, destructiveHint: true },
     },
     {
       name: "list_notes",
@@ -55,6 +70,7 @@ export function buildCleanTools(): ToolDef[] {
         },
         additionalProperties: false,
       },
+      annotations: { readOnlyHint: true },
     },
   ];
 }

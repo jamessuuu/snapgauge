@@ -1,0 +1,31 @@
+{
+  "name": "cache-hints-reversed-widening-is-risky",
+  "description": "Reversed cache pair: ttlMs lowered (compatible) but cacheScope private->public WIDENED is risky - responses may now be shared across authorization contexts (SPEC 5).",
+  "fixtureA": "drift-cache@v2",
+  "fixtureB": "clean@v1",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "ttlMs.lowered",
+      "tier": "compatible",
+      "subject": "discover.ttlMs"
+    },
+    {
+      "ruleId": "ttlMs.lowered",
+      "tier": "compatible",
+      "subject": "toolsList.ttlMs"
+    },
+    {
+      "ruleId": "cacheScope.widened",
+      "tier": "risky",
+      "subject": "discover.cacheScope"
+    },
+    {
+      "ruleId": "cacheScope.widened",
+      "tier": "risky",
+      "subject": "toolsList.cacheScope"
+    }
+  ]
+}

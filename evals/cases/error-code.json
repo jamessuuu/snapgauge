@@ -1,0 +1,16 @@
+{
+  "name": "behavior-error-code-changed",
+  "description": "drift-error-code@v2: the weather-noargs probe fails with -32602 on v1 and -32000 on v2 - error.code.changed (breaking), from captured behavior, exactly one finding.",
+  "fixtureA": "clean@v1",
+  "fixtureB": "drift-error-code@v2",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "error.code.changed",
+      "tier": "breaking",
+      "subject": "behavior.weather-noargs.errorCode"
+    }
+  ]
+}

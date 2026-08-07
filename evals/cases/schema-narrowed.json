@@ -1,0 +1,46 @@
+{
+  "name": "schema-drift-full-shape-taxonomy",
+  "description": "drift-schema@v2 plants one finding per schema rule family: enum removed+added, type narrowed+widened, required removed, output required added, output enum added - EXACTLY seven.",
+  "fixtureA": "clean@v1",
+  "fixtureB": "drift-schema@v2",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "tool.input.enum.removed",
+      "tier": "breaking",
+      "subject": "tools.get_weather.inputSchema.properties.units.enum"
+    },
+    {
+      "ruleId": "tool.input.type.narrowed",
+      "tier": "breaking",
+      "subject": "tools.list_notes.inputSchema.properties.limit.type"
+    },
+    {
+      "ruleId": "tool.output.required.added",
+      "tier": "breaking",
+      "subject": "tools.get_weather.outputSchema.required.conditions"
+    },
+    {
+      "ruleId": "output.enum.added",
+      "tier": "risky",
+      "subject": "tools.get_weather.outputSchema.properties.conditions.enum"
+    },
+    {
+      "ruleId": "tool.input.enum.added",
+      "tier": "compatible",
+      "subject": "tools.get_weather.inputSchema.properties.units.enum"
+    },
+    {
+      "ruleId": "tool.input.type.widened",
+      "tier": "compatible",
+      "subject": "tools.get_weather.inputSchema.properties.location.type"
+    },
+    {
+      "ruleId": "required.removed",
+      "tier": "compatible",
+      "subject": "tools.get_weather.inputSchema.required.location"
+    }
+  ]
+}

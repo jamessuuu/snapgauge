@@ -1,0 +1,26 @@
+{
+  "name": "annotation-relaxations-reversed-are-breaking",
+  "description": "The relaxed pair reversed: granting destructiveHint and revoking readOnly/idempotent hints - three breaking findings.",
+  "fixtureA": "drift-annotations-relaxed@v2",
+  "fixtureB": "clean@v1",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "annotation.destructiveHint.raised",
+      "tier": "breaking",
+      "subject": "tools.archive_note.annotations.destructiveHint"
+    },
+    {
+      "ruleId": "annotation.readOnlyHint.revoked",
+      "tier": "breaking",
+      "subject": "tools.get_weather.annotations.readOnlyHint"
+    },
+    {
+      "ruleId": "annotation.idempotentHint.revoked",
+      "tier": "breaking",
+      "subject": "tools.get_weather.annotations.idempotentHint"
+    }
+  ]
+}

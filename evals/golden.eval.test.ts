@@ -6,7 +6,8 @@
  * snapshots over the fixture transport, then offline diff — so the golden
  * set exercises the same path CI consumers run, exit codes included.
  *
- * M1 bar: 3 cases at 100% exact match. The set grows to ≥30 at M3 (SPEC §7).
+ * Bar (SPEC §7, M3): ≥30 cases at 100% exact match — CI fails on ANY
+ * mismatch, including a single false positive.
  */
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -73,8 +74,8 @@ function findingKey(f: { ruleId: string; tier: string; subject: string }): strin
 }
 
 describe("golden eval set (SPEC §7: 100% exact match)", () => {
-  it("carries exactly the M1 case count (grows to ≥30 at M3)", () => {
-    expect(cases).toHaveLength(3);
+  it("carries the SPEC §7 M3 bar: at least 30 cases", () => {
+    expect(cases.length).toBeGreaterThanOrEqual(30);
   });
 
   for (const golden of cases) {

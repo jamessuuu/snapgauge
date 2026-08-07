@@ -1,0 +1,31 @@
+{
+  "name": "cache-hints-ttl-raised-scope-narrowed",
+  "description": "drift-cache@v2: ttlMs raised (risky, stale-for-longer) on both cacheable surfaces; cacheScope public->private narrowed (compatible) on both.",
+  "fixtureA": "clean@v1",
+  "fixtureB": "drift-cache@v2",
+  "profile": "modern-full",
+  "failOn": "risky",
+  "expectedExit": 1,
+  "expectedFindings": [
+    {
+      "ruleId": "ttlMs.raised",
+      "tier": "risky",
+      "subject": "discover.ttlMs"
+    },
+    {
+      "ruleId": "ttlMs.raised",
+      "tier": "risky",
+      "subject": "toolsList.ttlMs"
+    },
+    {
+      "ruleId": "cacheScope.narrowed",
+      "tier": "compatible",
+      "subject": "discover.cacheScope"
+    },
+    {
+      "ruleId": "cacheScope.narrowed",
+      "tier": "compatible",
+      "subject": "toolsList.cacheScope"
+    }
+  ]
+}
