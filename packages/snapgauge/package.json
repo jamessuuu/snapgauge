@@ -1,0 +1,46 @@
+{
+  "name": "snapgauge",
+  "version": "0.1.0-alpha.0",
+  "description": "Contract tests for MCP servers: record a snapshot of a server's schema and observable behavior; fail CI when the next version moves.",
+  "license": "MIT",
+  "author": "James Lorenz Santos",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jamessuuu/snapgauge.git",
+    "directory": "packages/snapgauge"
+  },
+  "homepage": "https://github.com/jamessuuu/snapgauge#readme",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.build.json --noEmit",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "contract-testing",
+    "snapshot-testing",
+    "schema-drift",
+    "ci"
+  ]
+}
