@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+/*
+ * Palette binding (BRAND-KIT.md / agentjames docs/DESIGN.md — binding, do
+ * not invent colours): PAPER background, INK text/strokes, AMBER the one
+ * signal colour, RULE hairlines. 0-2px radius, no gradients, no glow, no
+ * dark chrome anywhere in this app.
+ */
+@theme {
+  --color-paper: #faf7f2;
+  --color-ink: #1a1712;
+  --color-amber: #b45309;
+  --color-rule: #e4ddd3;
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono:
+    ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* Every interactive control keeps a visible focus ring — no gesture-only
+   affordances (this app must be usable with a keyboard alone). */
+:focus-visible {
+  outline: 2px solid var(--color-amber);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-amber);
+  color: var(--color-paper);
+}

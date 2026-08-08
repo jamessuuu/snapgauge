@@ -25,11 +25,13 @@ jobs:
         run: pnpm lint
       - name: unit
         run: pnpm test -- --project unit
+      - name: install playwright browsers
+        run: pnpm --filter @snapgauge/web exec playwright install --with-deps chromium
       - name: e2e-smoke
-        # Becomes real at M5 when apps/web exists (Playwright against the
-        # built demo site). Kept as an explicit no-op stage, not omitted, so
-        # the pipeline shape is stable from the first commit.
-        run: echo "e2e:smoke lands at M5 (apps/web). Stage intentionally green."
+        # Real from M5 (apps/web): Playwright drives a production build of
+        # the demo site (playwright.config.ts's webServer runs `next build
+        # && next start`).
+        run: pnpm e2e:smoke
       - name: eval
         run: pnpm test -- --project eval
 
@@ -38,3 +40,8 @@ jobs:
         run: pnpm build
       - name: pack-check
         run: pnpm ci:pack-check
+      - name: brand drift
+        # scripts/brand.mjs is deterministic (SPEC's brand acceptance
+        # criterion, BRAND-KIT.md) — regenerate and fail if committed
+        # apps/web/public/brand/* differs from the generator's output.
+        run: pnpm ci:brand-check

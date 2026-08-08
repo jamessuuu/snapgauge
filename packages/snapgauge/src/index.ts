@@ -65,6 +65,7 @@ export {
   ERAS,
   runCompat,
   VERDICTS,
+  xhdrStaticFindings,
   type CompatClass,
   type CompatEngineOptions,
   type CompatFinding,

@@ -8,3 +8,6 @@ coverage/
 !.env.example
 .vercel/
 .DS_Store
+playwright-report/
+test-results/
+blob-report/

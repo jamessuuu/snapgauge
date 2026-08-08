@@ -456,32 +456,7 @@ export async function runCompat(options: CompatEngineOptions): Promise<CompatRes
     }
 
     // -- X-group static ----------------------------------------------------
-    for (const tool of tools) {
-      const reports = analyzeXmcpHeaders(tool.inputSchema);
-      const uniqueViolationsSeen = new Set<string>();
-      for (const report of reports) {
-        for (const violation of report.violations) {
-          if (violation === "not_unique") {
-            const key = report.header.toLowerCase();
-            if (uniqueViolationsSeen.has(key)) continue;
-            uniqueViolationsSeen.add(key);
-            findings.push({
-              ruleId: "xhdr.not_unique",
-              class: "violation",
-              subject: `tools.${tool.name}.inputSchema.x-mcp-header.${key}`,
-              message: `header "${report.header}" is bound more than once (case-insensitive) — this tool is invisible to conforming clients`,
-            });
-            continue;
-          }
-          findings.push({
-            ruleId: `xhdr.${violation}`,
-            class: "violation",
-            subject: `tools.${tool.name}.inputSchema.${report.path}`,
-            message: `x-mcp-header "${report.header}" ${describeXhdrViolation(violation)} — this tool is invisible to conforming clients`,
-          });
-        }
-      }
-    }
+    findings.push(...xhdrStaticFindings(tools));
 
     // -- behavior probes: baseline then each reduced profile ----------------
     const callProbe = async (
@@ -900,6 +875,46 @@ async function toolNameSet(
   } catch {
     return undefined;
   }
+}
+
+/**
+ * X-group static analysis (SPEC §5): every `x-mcp-header` declaration across
+ * a tool set, turned into `violation`-class findings. Pulled out of
+ * `runCompat` so the hosted demo's read-only live check (apps/web, SPEC §4 —
+ * never calls `tools/call`) can run the SAME static analysis, verbatim, on a
+ * third-party server's `tools/list` output.
+ */
+export function xhdrStaticFindings(
+  tools: readonly { name: string; inputSchema: JsonObject }[],
+): CompatFinding[] {
+  const findings: CompatFinding[] = [];
+  for (const tool of tools) {
+    const reports = analyzeXmcpHeaders(tool.inputSchema);
+    const uniqueViolationsSeen = new Set<string>();
+    for (const report of reports) {
+      for (const violation of report.violations) {
+        if (violation === "not_unique") {
+          const key = report.header.toLowerCase();
+          if (uniqueViolationsSeen.has(key)) continue;
+          uniqueViolationsSeen.add(key);
+          findings.push({
+            ruleId: "xhdr.not_unique",
+            class: "violation",
+            subject: `tools.${tool.name}.inputSchema.x-mcp-header.${key}`,
+            message: `header "${report.header}" is bound more than once (case-insensitive) — this tool is invisible to conforming clients`,
+          });
+          continue;
+        }
+        findings.push({
+          ruleId: `xhdr.${violation}`,
+          class: "violation",
+          subject: `tools.${tool.name}.inputSchema.${report.path}`,
+          message: `x-mcp-header "${report.header}" ${describeXhdrViolation(violation)} — this tool is invisible to conforming clients`,
+        });
+      }
+    }
+  }
+  return findings;
 }
 
 function describeXhdrViolation(violation: string): string {

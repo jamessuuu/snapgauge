@@ -19,7 +19,8 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./bin": "./src/cli/run.ts"
+    "./bin": "./src/cli/run.ts",
+    "./node": "./src/node/index.ts"
   },
   "publishConfig": {
     "access": "public",
@@ -31,6 +32,10 @@
       "./bin": {
         "types": "./dist/cli/run.d.ts",
         "default": "./dist/cli/run.js"
+      },
+      "./node": {
+        "types": "./dist/node/index.d.ts",
+        "default": "./dist/node/index.js"
       }
     }
   },

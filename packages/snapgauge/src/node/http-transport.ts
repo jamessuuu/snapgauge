@@ -29,6 +29,13 @@ export interface HttpTransportOptions {
   pinnedAddress?: ResolvedAddress;
   /** Per-request wall clock; default 10s (SPEC §6). */
   timeoutMs?: number;
+  /**
+   * Hard cap on a single response body, applied to EVERY request (not just
+   * SSE) once set — the hosted live check's per-request cost-safety cap
+   * (SPEC §4/§6: ≤256 KB each). Undefined (the CLI default) preserves the
+   * unbounded read every existing caller relies on.
+   */
+  maxBodyBytes?: number;
 }
 
 /** Cap on buffered stream reads for raw checks (SSE inspection, SPEC §5). */
@@ -90,8 +97,12 @@ export function createHttpTransport(options: HttpTransportOptions): HttpTranspor
     const responseHeaders = normalizeHeaders(response.headers);
     const contentType = responseHeaders["content-type"] ?? "";
     let text: string;
-    if (bufferStreams && contentType.startsWith("text/event-stream")) {
-      text = await readCapped(response.body);
+    if (options.maxBodyBytes !== undefined) {
+      // The hosted live check's per-response cap (SPEC §4/§6) — applies to
+      // every request, JSON or SSE alike, regardless of `bufferStreams`.
+      text = (await readCapped(response.body, options.maxBodyBytes)).text;
+    } else if (bufferStreams && contentType.startsWith("text/event-stream")) {
+      text = (await readCapped(response.body, RAW_STREAM_BYTE_CAP, RAW_STREAM_TIME_CAP_MS)).text;
     } else {
       try {
         text = await response.body.text();
@@ -179,17 +190,26 @@ function parseBody(text: string): Json {
   return validated.success ? validated.data : null;
 }
 
-/** Buffer a stream up to the byte/time caps, then stop reading (SSE checks). */
-async function readCapped(body: Dispatcher.ResponseData["body"]): Promise<string> {
+/** Buffer a stream up to a byte cap (and, for SSE, a time cap), then stop. */
+async function readCapped(
+  body: Dispatcher.ResponseData["body"],
+  capBytes: number,
+  timeCapMs?: number,
+): Promise<{ text: string; truncated: boolean }> {
   let buffered = "";
+  let truncated = false;
   const decoder = new TextDecoder();
-  const deadline = setTimeout(() => {
-    body.destroy();
-  }, RAW_STREAM_TIME_CAP_MS);
+  const deadline =
+    timeCapMs !== undefined
+      ? setTimeout(() => {
+          body.destroy();
+        }, timeCapMs)
+      : undefined;
   try {
     for await (const chunk of body) {
       buffered += decoder.decode(chunk as Uint8Array, { stream: true });
-      if (buffered.length >= RAW_STREAM_BYTE_CAP) {
+      if (buffered.length >= capBytes) {
+        truncated = true;
         body.destroy();
         break;
       }
@@ -197,9 +217,9 @@ async function readCapped(body: Dispatcher.ResponseData["body"]): Promise<string
   } catch {
     // A destroyed stream throws — the buffered window is the observation.
   } finally {
-    clearTimeout(deadline);
+    if (deadline !== undefined) clearTimeout(deadline);
   }
-  return buffered;
+  return { text: buffered, truncated };
 }
 
 function isTimeout(cause: unknown): boolean {

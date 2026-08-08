@@ -2,5 +2,33 @@
   "name": "@snapgauge/web",
   "private": true,
   "version": "0.0.0",
-  "description": "Next.js demo site (/, /demo, /board). Lands at M5 (SPEC §10); workspace entry reserved now so the repo layout matches SPEC §3 from the first commit."
+  "description": "Next.js demo site (/, /demo, /live, /board) — SPEC §4. Runs the real snapgauge engine offline in a Web Worker and, live, an SSRF-guarded read-only audit of a visitor-supplied MCP server URL.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
+    "start": "next start -p 3100",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "e2e:smoke": "node e2e/run-e2e.mjs"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.2",
+    "next": "^16.3.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "snapgauge": "workspace:*",
+    "@snapgauge/fixtures": "workspace:*",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.7.3"
+  }
 }
