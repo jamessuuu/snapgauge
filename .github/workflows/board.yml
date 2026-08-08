@@ -1,0 +1,57 @@
+name: board
+
+# Weekly refresh of boards/<date>.json (SPEC §8/§10 M6). The commit this job
+# makes doubles as the D4 keep-alive against GitHub Actions' 60-day
+# auto-disable of inactive scheduled workflows — see PROGRAM.md D4.
+#
+# Deliberately a NO-OP while boards/roster.json has zero targets
+# (scripts/run-board.mjs exits cleanly without writing or committing
+# anything): the roster is James's go/no-go (SPEC §11 Q1), not this job's
+# decision, and no third-party server is probed until he adds one.
+on:
+  schedule:
+    # Monday ~06:17 UTC — an off-peak minute, not the top-of-hour stampede
+    # every other scheduled workflow on GitHub fires at.
+    - cron: "17 6 * * 1"
+  workflow_dispatch: {}
+
+# Least privilege: this job only ever reads the repo and pushes a commit to
+# main (the board result itself). No PR write, no issues, no packages.
+permissions:
+  contents: write
+
+concurrency:
+  group: board
+  cancel-in-progress: false
+
+jobs:
+  board:
+    # Never runs on a fork — a fork's scheduled/workflow_dispatch run would
+    # otherwise try (and fail, harmlessly, on permissions) to push to a repo
+    # it does not own.
+    if: github.repository == 'jamessuuu/snapgauge'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter snapgauge build
+
+      - name: run board
+        run: node scripts/run-board.mjs
+
+      - name: commit board result (no-op if nothing changed)
+        run: |
+          git config user.name "snapgauge-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add boards/
+          if git diff --cached --quiet; then
+            echo "no board changes (empty roster, or an unchanged result) — nothing to commit"
+          else
+            git commit -m "chore(board): weekly refresh $(date -u +%F)"
+            git push
+          fi

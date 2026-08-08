@@ -6,6 +6,40 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: se
 ## [Unreleased]
 
 ### Added
+- M6 (the board, SPEC §8/§10): `boards/<YYYY-MM-DD>.json` + `boards/roster.json`
+  Zod schemas (`packages/snapgauge/src/core/board/schema.ts`) — the roster
+  is structurally narrower than a full config target (no `headers`, no
+  `probes`: the board is unauthenticated read-only and never calls
+  `tools/call` on a third party, enforced by the type, not merely by
+  convention); `checkBoardTarget` (`src/node/board-runner.ts`) reuses the
+  M4 compat engine with an empty probe spec and a filtered T-group
+  assertion list (`BOARD_TRANSPORT_ASSERTIONS`, excludes
+  `transport.meta_missing_not_32602` for the identical reason
+  `apps/web`'s `/live` check already excludes it) to produce era,
+  advertised `supportedVersions`, the T-group framing assertions,
+  cache-hint presence, `x-mcp-header` validity and the D-group checks
+  reachable without `tools/call` (advertised-version honesty,
+  per-connection stability, the legacy-initialize era probe) — proven by a
+  real-HTTP test that records every JSON-RPC method a target receives and
+  asserts `tools/call` never appears. The binding disclosure policy is
+  enforced in code (`core/board/disclosure.ts`): `buildBoardRow` computes
+  `mustViolationCount` from a run's MUST-fail assertions + violation-class
+  findings and withholds `era`/`supportedVersions`/`assertions`/`findings`
+  entirely — not merely empties them — until `publishedAt` is at least 7
+  days after `reportedAt`; the 7-day boundary is unit-tested on both sides.
+  `.github/workflows/board.yml`: weekly cron + `workflow_dispatch`,
+  guarded to the canonical repo, minimal (`contents: write`) permissions,
+  a deliberate no-op while the roster is empty (`scripts/run-board.mjs`)
+  that never fails the job over having nothing to check. `/board` now
+  renders committed board rows through `apps/web/src/lib/board-render.ts`
+  as neutral observations — a banned-word test covers both the fixed label
+  vocabulary and rendered output, including the `xhdr.unsafe_integer`
+  edge case (legitimate "unsafe-integer" spec vocabulary, not a security
+  claim) — while the M5 empty state and the >10-day dead-man banner are
+  unchanged. `compat.ttl_overpromise` (the one D-group rule that is
+  inherently a multi-run comparison) is deliberately deferred: the roster
+  ships empty, so there is no real board history to design or verify it
+  against yet (`boards/README.md`).
 - M3 (full diff taxonomy, SPEC §10): every rule id in the SPEC §5 tier
   table implemented in a metadata-carrying registry (36 rules: 13 breaking
   + the annotation.*.relaxed family at risky + 8 compatible + 4 cosmetic),

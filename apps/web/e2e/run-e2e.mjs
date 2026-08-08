@@ -9,9 +9,10 @@
  * behavior, not a bug this repo can fix), so the fixture has to exist
  * before `playwright test` is invoked at all, not inside its lifecycle.
  *
- * The repo commits with `boards/` absent (no board runs exist yet, M6 is
- * not built) — this fixture is removed again once the run finishes,
- * regardless of pass/fail, so the working tree is unaffected.
+ * `boards/roster.json` and `boards/README.md` are committed, permanent
+ * files (SPEC §8/§10 M6) — this only plants/removes the ONE dated fixture
+ * file it creates, never the directory itself, so a `boards/*.json` run
+ * left over from a real weekly job (or the roster/README) is never touched.
  */
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -28,8 +29,9 @@ function isoDateDaysAgo(days) {
 function plant() {
   mkdirSync(BOARDS_DIR, { recursive: true });
   const staleDate = isoDateDaysAgo(15);
+  const path = resolve(BOARDS_DIR, `${staleDate}.json`);
   writeFileSync(
-    resolve(BOARDS_DIR, `${staleDate}.json`),
+    path,
     JSON.stringify(
       {
         rows: [
@@ -40,13 +42,14 @@ function plant() {
       2,
     ),
   );
+  return path;
 }
 
-function remove() {
-  rmSync(BOARDS_DIR, { recursive: true, force: true });
+function remove(plantedPath) {
+  rmSync(plantedPath, { force: true });
 }
 
-plant();
+const plantedPath = plant();
 
 // shell:true is required on Windows to resolve the pnpm.cmd shim; argv here
 // is always locally/CI-supplied (playwright CLI flags), never remote input.
@@ -56,7 +59,7 @@ const playwright = spawn("pnpm", ["exec", "playwright", "test", ...process.argv.
 });
 
 playwright.on("close", (code) => {
-  remove();
+  remove(plantedPath);
   process.exit(code ?? 1);
 });
 
@@ -64,7 +67,7 @@ playwright.on("close", (code) => {
 // is killed rather than exiting normally.
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {
-    remove();
+    remove(plantedPath);
     process.exit(1);
   });
 }

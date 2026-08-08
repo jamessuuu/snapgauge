@@ -120,3 +120,22 @@ export {
   type Finding,
   type Tier,
 } from "./core/diff/diff.js";
+export {
+  BOARD_ROW_STATUSES,
+  BoardFileSchema,
+  BoardRowSchema,
+  RosterSchema,
+  RosterTargetSchema,
+  type BoardFile,
+  type BoardRow,
+  type BoardRowStatus,
+  type Roster,
+  type RosterTarget,
+} from "./core/board/schema.js";
+export {
+  buildBoardRow,
+  isPublishable,
+  mustViolationCountOf,
+  type BuildBoardRowInput,
+  type DisclosureInput,
+} from "./core/board/disclosure.js";

@@ -20,3 +20,11 @@ export {
   type HttpTransportOptions,
 } from "./http-transport.js";
 export { ConfigSchema, type SnapgaugeConfig, type TargetConfig } from "./config.js";
+export {
+  BOARD_TRANSPORT_ASSERTIONS,
+  checkBoardTarget,
+  type BoardCheckInput,
+  type BoardCheckOutcome,
+  type BoardCheckStatus,
+} from "./board-runner.js";
+export { readBoardFile, readRosterFile, writeBoardFileAtomic } from "./board-io.js";

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { boardStatus } from "@/lib/board";
 import { loadBoards } from "@/lib/board-loader";
+import { disclosureLabel, parseBoardRow, statusLabel, supportedVersionsLabel } from "@/lib/board-render";
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -78,16 +79,49 @@ export default function BoardPage() {
                 <thead>
                   <tr className="border-b border-rule bg-ink/[0.03] text-left">
                     <th className="px-3 py-2 font-semibold">server</th>
-                    <th className="px-3 py-2 font-semibold">fields</th>
+                    <th className="px-3 py-2 font-semibold">status</th>
+                    <th className="px-3 py-2 font-semibold">supported versions</th>
+                    <th className="px-3 py-2 font-semibold">disclosure</th>
+                    <th className="px-3 py-2 font-semibold">checked</th>
+                    <th className="px-3 py-2 font-semibold">reproduce</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {status.newest.rows.map((row, index) => (
-                    <tr key={`${row.server}-${String(index)}`} className="border-b border-rule last:border-b-0 align-top">
-                      <td className="px-3 py-2 font-mono">{row.server}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{JSON.stringify(row)}</td>
-                    </tr>
-                  ))}
+                  {status.newest.rows.map((raw, index) => {
+                    const row = parseBoardRow(raw);
+                    if (row === undefined) {
+                      // A row that does not match the current BoardRowSchema
+                      // (e.g. from an older format) never crashes the page —
+                      // it renders as-observed instead (SPEC §6).
+                      return (
+                        <tr
+                          key={`${raw.server}-${String(index)}`}
+                          className="border-b border-rule last:border-b-0 align-top"
+                        >
+                          <td className="px-3 py-2 font-mono">{raw.server}</td>
+                          <td className="px-3 py-2 font-mono text-xs" colSpan={5}>
+                            {JSON.stringify(raw)}
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return (
+                      <tr key={row.server} className="border-b border-rule last:border-b-0 align-top">
+                        <td className="px-3 py-2 font-mono">{row.server}</td>
+                        <td className="px-3 py-2">{statusLabel(row)}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{supportedVersionsLabel(row)}</td>
+                        <td className="px-3 py-2">{disclosureLabel(row)}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{row.checkedAt}</td>
+                        <td className="px-3 py-2">
+                          <code className="font-mono text-xs">{row.command}</code>
+                          {" · "}
+                          <a href={row.resultUrl} className="underline underline-offset-2 hover:text-amber">
+                            raw result
+                          </a>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -17,8 +17,10 @@
 import { z } from "zod";
 import {
   runTransportAssertions,
+  TRANSPORT_ASSERTIONS,
   type AssertionObservations,
   AssertionReportSchema,
+  type TransportAssertion,
 } from "../assertions.js";
 import { SnapgaugeError } from "../errors.js";
 import { jcsCanonical, type Json, type JsonObject } from "../json.js";
@@ -76,6 +78,15 @@ export interface CompatEngineOptions {
   profiles: readonly Profile[];
   probes: readonly ProbeDecl[];
   kind: TransportKind;
+  /**
+   * Override the T-group assertion registry. Defaults to the full
+   * `TRANSPORT_ASSERTIONS` catalog. The board (SPEC §8, M6) passes a
+   * filtered list that excludes `transport.meta_missing_not_32602` — the
+   * one T-group assertion that issues a real `tools/call` — for the same
+   * reason `apps/web/src/lib/live-check.ts`'s `WEB_SAFE_ASSERTIONS` does:
+   * the board never calls `tools/call` on a third-party server (SPEC §1/§8).
+   */
+  assertions?: readonly TransportAssertion[];
 }
 
 /** The reported-degradation marker (SPEC §5 degrade.* — wire key pinned here). */
@@ -622,14 +633,17 @@ export async function runCompat(options: CompatEngineOptions): Promise<CompatRes
       ...(listOk ? { cacheScopeByPage: pageScopes } : {}),
       observedErrorCodes: errorCodes,
     };
-    const assertions = await runTransportAssertions({
-      kind: options.kind,
-      raw: baseTransport.raw?.bind(baseTransport),
-      serverName,
-      protocolVersion: baseline.protocolVersion,
-      sampleTool: tools[0]?.name,
-      observations,
-    });
+    const assertions = await runTransportAssertions(
+      {
+        kind: options.kind,
+        raw: baseTransport.raw?.bind(baseTransport),
+        serverName,
+        protocolVersion: baseline.protocolVersion,
+        sampleTool: tools[0]?.name,
+        observations,
+      },
+      options.assertions ?? TRANSPORT_ASSERTIONS,
+    );
     for (const report of assertions) {
       if (report.verdict === "fail") {
         findings.push({

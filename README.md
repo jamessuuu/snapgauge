@@ -4,7 +4,7 @@
 observable behavior; fail CI when the next version moves. Deterministic,
 offline-capable, zero LLM.**
 
-> **Status: pre-release, M0–M5 landed.** The design in
+> **Status: pre-release, M0–M6 landed.** The design in
 > [docs/SPEC.md](docs/SPEC.md) is approved and frozen for v1; implementation is
 > landing milestone by milestone (SPEC §10). Nothing below claims to work until
 > its milestone's tests say so — this README grows only as fast as the receipts do.
@@ -17,9 +17,11 @@ offline-capable, zero LLM.**
 > transports; the CLI; and the demo site — `/` (static), `/demo` (the real engine,
 > offline, in a Web Worker), `/live` + `POST /api/check` (an SSRF-guarded,
 > rate-limited, read-only live audit of a visitor-named server), and `/board`
-> (ships honestly empty — the weekly board job is M6, not yet built). Not yet
-> real: the board's own scheduled runs and published rows (M6); the published
-> npm package and GitHub Action (M7).
+> (the schema, the weekly Actions job, the disclosure-policy validator, and the
+> render path are all built and tested — `boards/roster.json` ships empty on
+> purpose, since which public servers belong on it is James's call, SPEC §11
+> Q1, so `/board` still shows the honest empty state until that's decided).
+> Not yet real: the published npm package and GitHub Action (M7).
 
 ## Why
 
@@ -55,7 +57,7 @@ different fix.
 | 0 | clean | implemented |
 | 1 | drift at/above the gate (`--fail-on`, default `risky`) | implemented |
 | 2 | probe/connection failure (unreachable, malformed responses) | implemented |
-| 3 | compat/degradation violation — the server is wrong, not merely different | lands at M4 |
+| 3 | compat/degradation violation — the server is wrong, not merely different | implemented |
 | 4 | usage / config / snapshot-format error (incl. probe-spec mismatch: re-record) | implemented |
 | 5 | internal error | implemented |
 

@@ -22,7 +22,9 @@ export const FORMAT_VERSION = 1;
 export const RULESET_VERSION = 3;
 
 const Sha256HexSchema = z.string().regex(/^[0-9a-f]{64}$/, "sha-256 hex");
-const Iso8601Schema = z
+/** Exported so peer modules (e.g. core/board/*, SPEC §8 M6) share one ISO
+ * 8601 timestamp definition instead of redeclaring the regex. */
+export const Iso8601Schema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/, "ISO 8601 timestamp");
 

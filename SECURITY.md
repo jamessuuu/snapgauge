@@ -63,7 +63,10 @@ The live check (`apps/web/src/lib/live-check.ts`) calls `record()` with an
 **empty declared probe spec** — `record()` only issues `tools/call` for
 probes it is given, and the hosted demo declares none. What it does call:
 `server/discover` and `tools/list` (paginated, 3-repeat stability check) —
-read-only discovery, the same surface the board (SPEC §8, lands at M6) reads.
+read-only discovery, the same surface the board (SPEC §8,
+`packages/snapgauge/src/node/board-runner.ts`) reads. The board additionally
+excludes `transport.meta_missing_not_32602` from the T-group assertions it
+runs, for the identical reason below.
 
 One T-group framing assertion, `transport.meta_missing_not_32602`, issues a
 real `tools/call` in the CLI/eval suite (deliberately missing `_meta`, to
