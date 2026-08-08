@@ -33,10 +33,11 @@ import {
   runTransportAssertions,
   xhdrStaticFindings,
   type CheckOutput,
+  type ErrorCode,
   type ExitCode,
   type Transport,
 } from "snapgauge";
-import { createHttpTransport } from "snapgauge/node";
+import { createHttpTransport, type AuthorizedTarget, type LookupFn } from "snapgauge/node";
 import { authorizeWebTarget } from "./ssrf-policy.js";
 
 /** SPEC §6 cost safety caps. */
@@ -103,35 +104,109 @@ function budgeted(inner: Transport): Transport {
   return wrapped;
 }
 
-export async function runLiveCheck(rawUrl: string): Promise<CheckOutput> {
-  const authorized = await authorizeWebTarget(rawUrl);
-  const transport = budgeted(
-    createHttpTransport({
-      url: authorized.url,
-      protocolVersion: MODERN_FULL.protocolVersion,
-      ...(authorized.pinnedAddress !== undefined ? { pinnedAddress: authorized.pinnedAddress } : {}),
-      timeoutMs: PER_REQUEST_TIMEOUT_MS,
-      maxBodyBytes: MAX_BODY_BYTES,
-    }),
-  );
+/**
+ * Web-boundary error redaction (SECURITY.md "never the resolved IP, never
+ * the upstream error text"): `PROBE_FAILURE`/`PROBE_TIMEOUT` messages can
+ * originate from a raw Node/undici error interpolated by `describe(cause)`
+ * (packages/snapgauge/src/node/http-transport.ts:93,110) — a connection
+ * refusal or TLS failure embeds the PINNED resolved IP and port, exactly the
+ * address the SSRF policy is supposed to keep private. The CLI legitimately
+ * prints that detail in the operator's own terminal
+ * (packages/snapgauge/src/cli/run.ts `reportError`); the hosted demo must
+ * not. Every `SnapgaugeError` of these two codes is mapped to a fixed,
+ * generic message HERE, regardless of which code path produced it —
+ * including the cost-cap failures thrown by `budgeted()` above, which carry
+ * no sensitive detail but are redacted anyway so the guarantee holds by
+ * CODE, not by auditing every call site (including ones added later). The
+ * typed CODE (and the HTTP status `apps/web/src/lib/errors.ts` derives from
+ * it) is preserved; only `.message` changes. `cause` is preserved on the new
+ * error for server-side diagnostics — `route.ts` only ever reads `.code`
+ * and `.message`, so it never reaches the client.
+ */
+const REDACTED_MESSAGE: Partial<Record<ErrorCode, string>> = {
+  PROBE_FAILURE: "the live check could not complete against this target (connection or protocol failure)",
+  PROBE_TIMEOUT: "the live check did not complete within its time budget",
+};
 
+function toClientSafeError(error: unknown): unknown {
+  if (error instanceof SnapgaugeError) {
+    const redactedMessage = REDACTED_MESSAGE[error.code];
+    if (redactedMessage !== undefined) {
+      return new SnapgaugeError(error.code, redactedMessage, { cause: error });
+    }
+  }
+  return error;
+}
+
+export interface RunLiveCheckOptions {
+  /**
+   * Test-only: use this already-authorized target directly, skipping
+   * `authorizeWebTarget` entirely. Mirrors how `ssrf-block-matrix.test.ts`'s
+   * own redirect test exercises the connection layer against a local
+   * server, treating "authorized" as a given rather than re-proving the
+   * SSRF gate (that suite's own job) — the only way to point this function
+   * at a local test server, since a real `public-only` authorization can
+   * never resolve to loopback. Unset in production — `route.ts` always goes
+   * through the real gate.
+   */
+  authorizedTarget?: AuthorizedTarget;
+  /**
+   * Test-only DNS override, forwarded to `authorizeWebTarget` when
+   * `authorizedTarget` is not supplied (mirrors that function's own seam).
+   * Unset in production — real `node:dns` is always used there.
+   */
+  lookup?: LookupFn;
+  /** Test-only wall-clock override (ms). Unset in production — defaults to `WALL_CLOCK_MS`. */
+  wallClockMs?: number;
+}
+
+export async function runLiveCheck(rawUrl: string, options: RunLiveCheckOptions = {}): Promise<CheckOutput> {
+  const wallClockMs = options.wallClockMs ?? WALL_CLOCK_MS;
+  // Cancels in-flight work when the wall-clock budget wins the race below —
+  // composed into every per-request signal inside http-transport.ts, so
+  // losing the race actually tears the socket down instead of leaving a
+  // fetch running behind an already-returned response (the defect: it used
+  // to only race the RETURN VALUE, never cancelling the loser).
+  const controller = new AbortController();
+  let transport: Transport | undefined;
   let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
-  const deadline = new Promise<never>((_resolve, reject) => {
-    deadlineTimer = setTimeout(() => {
-      reject(
-        new SnapgaugeError(
-          "PROBE_TIMEOUT",
-          `check exceeded the ${String(WALL_CLOCK_MS)}ms wall-clock budget (SPEC §6)`,
-        ),
-      );
-    }, WALL_CLOCK_MS);
-  });
 
   try {
+    const authorized = options.authorizedTarget ?? (await authorizeWebTarget(rawUrl, options.lookup));
+    transport = budgeted(
+      createHttpTransport({
+        url: authorized.url,
+        protocolVersion: MODERN_FULL.protocolVersion,
+        ...(authorized.pinnedAddress !== undefined ? { pinnedAddress: authorized.pinnedAddress } : {}),
+        timeoutMs: PER_REQUEST_TIMEOUT_MS,
+        maxBodyBytes: MAX_BODY_BYTES,
+        signal: controller.signal,
+      }),
+    );
+
+    const deadline = new Promise<never>((_resolve, reject) => {
+      deadlineTimer = setTimeout(() => {
+        // No custom reason: the default abort reason is a DOMException named
+        // "AbortError", which is what http-transport.ts's `isTimeout()`
+        // pattern-matches on to classify the resulting rejection as
+        // PROBE_TIMEOUT (not PROBE_FAILURE) — an SnapgaugeError reason would
+        // carry `.name === "SnapgaugeError"` instead and be misclassified.
+        controller.abort();
+        reject(
+          new SnapgaugeError(
+            "PROBE_TIMEOUT",
+            `check exceeded the ${String(wallClockMs)}ms wall-clock budget (SPEC §6)`,
+          ),
+        );
+      }, wallClockMs);
+    });
+
     return await Promise.race([pipeline(transport, authorized.url), deadline]);
+  } catch (error) {
+    throw toClientSafeError(error);
   } finally {
     if (deadlineTimer !== undefined) clearTimeout(deadlineTimer);
-    await transport.close?.();
+    await transport?.close?.();
   }
 }
 

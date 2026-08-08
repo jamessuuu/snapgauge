@@ -36,6 +36,15 @@ export interface HttpTransportOptions {
    * unbounded read every existing caller relies on.
    */
   maxBodyBytes?: number;
+  /**
+   * An external cancellation signal, composed with the per-request timeout
+   * via `AbortSignal.any` — whichever fires first aborts the in-flight
+   * request. Lets a caller enforce a check-wide budget (e.g. the hosted live
+   * check's 20s wall clock, `apps/web/src/lib/live-check.ts`) that actually
+   * cancels sockets instead of merely racing the return value. Undefined
+   * (the CLI default) preserves today's per-request-timeout-only behavior.
+   */
+  signal?: AbortSignal;
 }
 
 /** Cap on buffered stream reads for raw checks (SSE inspection, SPEC §5). */
@@ -73,12 +82,21 @@ export function createHttpTransport(options: HttpTransportOptions): HttpTranspor
     }
     let response: Dispatcher.ResponseData;
     try {
+      // The per-request timeout ALWAYS applies; an external `options.signal`
+      // (the hosted check's whole-run wall-clock budget) is composed on top
+      // via AbortSignal.any so either one can cancel this request — losing
+      // the wall-clock race then actually tears down the socket instead of
+      // leaving it running behind an already-returned response.
+      const requestSignal =
+        options.signal !== undefined
+          ? AbortSignal.any([AbortSignal.timeout(timeoutMs), options.signal])
+          : AbortSignal.timeout(timeoutMs);
       response = await request(url, {
         method,
         headers: effectiveHeaders,
         ...(bodyText !== undefined ? { body: bodyText } : {}),
         dispatcher: agent,
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: requestSignal,
         // Redirects are not followed: undici's plain `request` never follows
         // them (maxRedirections 0 semantics) — SPEC §6 transport.redirect.
       });
