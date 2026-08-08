@@ -12,7 +12,7 @@
 import { Command, CommanderError } from "commander";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { runTransportAssertions } from "../core/assertions.js";
+import { runCompat, type CompatResult } from "../core/compat/engine.js";
 import {
   DiffOutputSchema,
   diffSnapshots,
@@ -37,6 +37,7 @@ import {
   render,
   summarize,
   type CheckOutput,
+  type CompatSection,
   type ReportFormat,
 } from "../core/report/report.js";
 import { createFixtureTransport } from "../core/transport.js";
@@ -45,11 +46,11 @@ import { loadConfig, type SnapgaugeConfig, type TargetConfig } from "../node/con
 import { readSnapshotFile, writeSnapshotFileAtomic } from "../node/snapshot-io.js";
 import {
   assertTargetName,
-  buildLiveTarget,
+  buildTargetFactory,
   pickTarget,
   resolveFixtureEntry,
   resolveProfiles,
-  type LiveTarget,
+  type TargetFactory,
 } from "./targets.js";
 
 export interface CliIo {
@@ -107,6 +108,17 @@ interface InitCommandOptions {
 
 interface ReportCommandOptions {
   format: string;
+}
+
+interface CompatCommandOptions {
+  config?: string;
+  fixture?: string;
+  fixturesModule: string;
+  profiles?: string;
+  timeout?: string;
+  strictNet?: boolean;
+  reporter: string;
+  json?: boolean;
 }
 
 export async function runCli(
@@ -194,6 +206,28 @@ export async function runCli(
     });
 
   program
+    .command("compat")
+    .description(
+      "profile matrix + degradation assertions only (SPEC §4): T/X/D groups under the built-in client profiles; exit 3 on violations",
+    )
+    .argument("[target]", "target name (config key)")
+    .option("--config <path>", "config file")
+    .option("--fixture <name>", "fixture shortcut: run compat against this fixture without a config")
+    .option(
+      "--fixtures-module <specifier>",
+      "module exporting getFixtureEntry(name)",
+      "@snapgauge/fixtures",
+    )
+    .option("--profiles <names>", "comma list of client profiles (default: target profiles, else all built-ins)")
+    .option("--timeout <ms>", "per-request timeout override")
+    .option("--strict-net", "address policy public-only (SPEC §3 Decision 4)")
+    .option("--reporter <format>", "text|json|github|md", "text")
+    .option("--json", "shorthand for --reporter json")
+    .action(async (target: string | undefined, options: CompatCommandOptions) => {
+      code = await compatCommand(target, options, io, ctx);
+    });
+
+  program
     .command("diff")
     .description("offline diff of two snapshot files — no network (SPEC §4)")
     .argument("<a>", "old snapshot file")
@@ -255,20 +289,21 @@ async function recordCommand(
     const loaded = await loadConfig(ctx.cwd, options.config);
     const { name, target: targetConfig } = pickTarget(loaded.config, target);
     assertTargetName(name);
-    const live = await buildLiveTarget(targetConfig, {
+    const factory = await buildTargetFactory(targetConfig, {
       strictNet: options.strictNet,
       timeoutMs: parseTimeout(options.timeout),
       env: ctx.env,
     });
-    for (const warning of live.warnings) io.stderr(`warning: ${warning}`);
+    for (const warning of factory.warnings) io.stderr(`warning: ${warning}`);
+    const transport = await factory.forProfile(factory.primary);
     try {
       const outcome = await record({
-        transport: live.transport,
-        target: live.snapshotTarget,
-        probeSpec: live.probeSpec,
+        transport,
+        target: factory.snapshotTarget,
+        probeSpec: factory.probeSpec,
         recordedAt,
-        clientCapabilities: live.profile.clientCapabilities,
-        volatile: live.volatile,
+        clientCapabilities: factory.primary.clientCapabilities,
+        volatile: factory.volatile,
       });
       if (outcome.probeFailures.length > 0) {
         return failProbes(outcome, io, "no snapshot written");
@@ -278,7 +313,7 @@ async function recordCommand(
       io.stdout(`recorded ${name} -> ${file} (${String(outcome.snapshot.tools.length)} tools)`);
       return EXIT.CLEAN;
     } finally {
-      await live.transport.close?.();
+      await transport.close?.();
     }
   } catch (error) {
     return reportError(error, io);
@@ -355,66 +390,165 @@ async function checkCommand(
       );
     }
     const stored = readSnapshotFile(storedFile, { migrate: options.migrate === true });
-    const live = await buildLiveTarget(targetConfig, {
+    const factory = await buildTargetFactory(targetConfig, {
       strictNet: options.strictNet,
       timeoutMs: parseTimeout(options.timeout),
       env: ctx.env,
     });
-    for (const warning of live.warnings) io.stderr(`warning: ${warning}`);
+    for (const warning of factory.warnings) io.stderr(`warning: ${warning}`);
+    const transport = await factory.forProfile(factory.primary);
+    let outcome: RecordOutcome;
     try {
-      const outcome = await record({
-        transport: live.transport,
-        target: live.snapshotTarget,
-        probeSpec: live.probeSpec,
+      outcome = await record({
+        transport,
+        target: factory.snapshotTarget,
+        probeSpec: factory.probeSpec,
         recordedAt,
-        clientCapabilities: live.profile.clientCapabilities,
-        volatile: live.volatile,
+        clientCapabilities: factory.primary.clientCapabilities,
+        volatile: factory.volatile,
       });
-      const assertions = await runTransportAssertions({
-        kind: live.snapshotTarget.transport,
-        raw: live.transport.raw?.bind(live.transport),
-        serverName: outcome.snapshot.discover.serverInfo.name,
-        protocolVersion: live.snapshotTarget.protocolVersion,
-      });
-      const failOn = parseTier(options.failOn ?? targetConfig.failOn ?? "risky");
-      const ignore = new Set([
-        ...(targetConfig.ignore ?? []),
-        ...splitList(options.ignore),
-      ]);
-      const only = splitList(options.only).map(parseTier);
-      const diffResult = diffSnapshots(stored, outcome.snapshot);
-      const findings = filterFindings(diffResult.findings, ignore, only);
-      const failed = gateFailed({ findings, summary: summarize(findings) }, failOn);
-      const incomplete = outcome.probeFailures.length > 0;
-      const mustFailed = assertions.some((a) => a.verdict === "fail");
-      const exitCode: ExitCode = incomplete
-        ? EXIT.PROBE
-        : mustFailed
-          ? EXIT.COMPAT
-          : failed
-            ? EXIT.DRIFT
-            : EXIT.CLEAN;
-      const updated = options.update === true && !incomplete;
-      if (updated) writeSnapshotFileAtomic(storedFile, outcome.snapshot);
-      const output: CheckOutput = {
-        command: "check",
-        target: { name, transport: live.snapshotTarget.transport },
-        findings,
-        summary: summarize(findings),
-        gate: { failOn, failed },
-        assertions,
-        ...(incomplete ? { incomplete: true } : {}),
-        ...(updated ? { updated: true } : {}),
-        exitCode,
-      };
-      for (const failure of outcome.probeFailures) {
-        io.stderr(`probe "${failure.probeId}" failed: ${failure.message}`);
-      }
-      for (const line of render(output, format)) io.stdout(line);
-      return exitCode;
     } finally {
-      await live.transport.close?.();
+      await transport.close?.();
     }
+    // The compat matrix (SPEC §4: probe live -> diff vs stored -> compat
+    // matrix -> gate). The engine opens one transport per profile and
+    // closes what it opens.
+    const compat = await runCompat({
+      transportForProfile: (profile) => factory.forProfile(profile),
+      transportForProtocolVersion: (version) => factory.forProtocolVersion(version),
+      profiles: factory.profiles,
+      probes: factory.probeSpec.probes,
+      kind: factory.kind,
+    });
+    const failOn = parseTier(options.failOn ?? targetConfig.failOn ?? "risky");
+    const ignore = new Set([
+      ...(targetConfig.ignore ?? []),
+      ...splitList(options.ignore),
+    ]);
+    const only = splitList(options.only).map(parseTier);
+    const diffResult = diffSnapshots(stored, outcome.snapshot);
+    const findings = filterFindings(diffResult.findings, ignore, only);
+    const failed = gateFailed({ findings, summary: summarize(findings) }, failOn);
+    const incomplete = outcome.probeFailures.length > 0;
+    // Exit precedence (SPEC §5/§6): missing evidence (2) beats a compat
+    // violation (3) beats drift (1). 1 vs 3 is deliberate - different
+    // owner, different fix. Compat findings below violation class are
+    // LISTED here; `snapgauge compat` gates them.
+    const violation = compat.findings.some((f) => f.class === "violation");
+    const exitCode: ExitCode = incomplete
+      ? EXIT.PROBE
+      : violation
+        ? EXIT.COMPAT
+        : failed
+          ? EXIT.DRIFT
+          : EXIT.CLEAN;
+    const updated = options.update === true && !incomplete;
+    if (updated) writeSnapshotFileAtomic(storedFile, outcome.snapshot);
+    const output: CheckOutput = {
+      command: "check",
+      target: { name, transport: factory.kind },
+      findings,
+      summary: summarize(findings),
+      gate: { failOn, failed },
+      assertions: compat.assertions,
+      compat: compatSection(compat),
+      ...(incomplete ? { incomplete: true } : {}),
+      ...(updated ? { updated: true } : {}),
+      exitCode,
+    };
+    for (const failure of outcome.probeFailures) {
+      io.stderr(`probe "${failure.probeId}" failed: ${failure.message}`);
+    }
+    for (const line of render(output, format)) io.stdout(line);
+    return exitCode;
+  } catch (error) {
+    return reportError(error, io);
+  }
+}
+
+function compatSection(result: CompatResult): CompatSection {
+  return {
+    era: result.era,
+    profiles: result.profiles,
+    findings: result.findings,
+    verdicts: result.verdicts,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// compat
+
+async function compatCommand(
+  target: string | undefined,
+  options: CompatCommandOptions,
+  io: CliIo,
+  ctx: CliContext,
+): Promise<ExitCode> {
+  try {
+    const format = options.json === true ? ("json" as const) : parseReportFormat(options.reporter);
+    let factory: TargetFactory;
+    let name: string;
+    if (options.fixture !== undefined) {
+      name = options.fixture;
+      const entry = await resolveFixtureEntry(options.fixturesModule, options.fixture);
+      const { primary, profiles } = resolveProfiles(
+        options.profiles !== undefined ? splitList(options.profiles) : undefined,
+      );
+      factory = {
+        kind: "fixture",
+        snapshotTarget: {
+          transport: "fixture",
+          host: options.fixture,
+          path: "",
+          protocolVersion: primary.protocolVersion,
+          auth: "none",
+        },
+        probeSpec: { probes: entry.probes, profiles: profiles.map((p) => p.name) },
+        primary,
+        profiles,
+        volatile: [],
+        warnings: [],
+        forProfile: (profile) => createFixtureTransport(entry.server, profile, entry.raw),
+        forProtocolVersion: (version) =>
+          createFixtureTransport(entry.server, { ...primary, protocolVersion: version }, entry.raw),
+      };
+    } else {
+      const loaded = await loadConfig(ctx.cwd, options.config);
+      const picked = pickTarget(loaded.config, target);
+      name = picked.name;
+      assertTargetName(name);
+      factory = await buildTargetFactory(picked.target, {
+        strictNet: options.strictNet,
+        timeoutMs: parseTimeout(options.timeout),
+        env: ctx.env,
+        ...(options.profiles !== undefined ? { profileNames: splitList(options.profiles) } : {}),
+      });
+      for (const warning of factory.warnings) io.stderr(`warning: ${warning}`);
+    }
+    const result = await runCompat({
+      transportForProfile: (profile) => factory.forProfile(profile),
+      transportForProtocolVersion: (version) => factory.forProtocolVersion(version),
+      profiles: factory.profiles,
+      probes: factory.probeSpec.probes,
+      kind: factory.kind,
+    });
+    // Exit contract (SPEC §5): violation -> 3 (the server is WRONG, not
+    // merely different); risky-class findings -> 1; else 0.
+    const violation = result.findings.some((f) => f.class === "violation");
+    const risky = result.findings.some((f) => f.class === "risky");
+    const exitCode: ExitCode = violation ? EXIT.COMPAT : risky ? EXIT.DRIFT : EXIT.CLEAN;
+    const output: CheckOutput = {
+      command: "compat",
+      target: { name, transport: factory.kind },
+      findings: [],
+      summary: { breaking: 0, risky: 0, compatible: 0, cosmetic: 0 },
+      gate: { failOn: "risky", failed: exitCode !== EXIT.CLEAN },
+      assertions: result.assertions,
+      compat: compatSection(result),
+      exitCode,
+    };
+    for (const line of render(output, format)) io.stdout(line);
+    return exitCode;
   } catch (error) {
     return reportError(error, io);
   }
@@ -483,7 +617,7 @@ async function initCommand(
   io: CliIo,
   ctx: CliContext,
 ): Promise<ExitCode> {
-  let live: LiveTarget | undefined;
+  let transport: Awaited<ReturnType<TargetFactory["forProfile"]>> | undefined;
   try {
     assertTargetName(options.target);
     const configPath = resolve(ctx.cwd, "snapgauge.config.json");
@@ -494,15 +628,16 @@ async function initCommand(
       );
     }
     const targetConfig = initTargetConfig(options);
-    live = await buildLiveTarget(targetConfig, { env: ctx.env });
+    const factory = await buildTargetFactory(targetConfig, { env: ctx.env });
+    transport = await factory.forProfile(factory.primary);
     // Probe first (SPEC §4: init probes the target and seeds probes from
     // tools/list); nothing is written when the target is unreachable.
     const outcome = await record({
-      transport: live.transport,
-      target: live.snapshotTarget,
+      transport,
+      target: factory.snapshotTarget,
       probeSpec: { probes: [], profiles: ["modern-full"] },
       recordedAt: new Date().toISOString(),
-      clientCapabilities: live.profile.clientCapabilities,
+      clientCapabilities: factory.primary.clientCapabilities,
     });
     const probes = outcome.snapshot.tools.map((tool) => seedProbe(tool.name, tool.inputSchema));
     const config: SnapgaugeConfig = {
@@ -518,7 +653,7 @@ async function initCommand(
   } catch (error) {
     return reportError(error, io);
   } finally {
-    await live?.transport.close?.();
+    await transport?.close?.();
   }
 }
 

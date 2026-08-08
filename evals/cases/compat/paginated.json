@@ -1,0 +1,17 @@
+{
+  "name": "paginated: cacheScope flips between page 1 and page 2",
+  "description": "tools/list page 1 reports cacheScope public, page 2 reports private — the spec MUST is identical cacheScope on every page of a paginated list. A single violation; era is modern-only (initialize is a legacy method this fixture also rejects helpfully).",
+  "fixture": "paginated",
+  "profiles": ["modern-full"],
+  "expectedExit": 3,
+  "expectedEra": "modern-only",
+  "expectedFindings": [
+    { "ruleId": "compat.era", "class": "info", "subject": "discover" },
+    {
+      "ruleId": "transport.cachescope_inconsistent_across_pages",
+      "class": "violation",
+      "subject": "transport"
+    }
+  ],
+  "expectedVerdicts": {}
+}

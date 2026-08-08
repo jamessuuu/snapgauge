@@ -1,0 +1,20 @@
+{
+  "name": "degrader-silent: same degradation, no signal — risky, not a violation",
+  "description": "summarize_note degrades under modern-minimal exactly like degrader-honest but never marks the result — permitted by the spec, so it is reported at risky (degraded-silent) and gates at exit 1, distinct from a true violation. redact_note still declines correctly.",
+  "fixture": "degrader-silent",
+  "profiles": ["modern-full", "modern-minimal"],
+  "expectedExit": 1,
+  "expectedEra": "modern-only",
+  "expectedFindings": [
+    { "ruleId": "compat.era", "class": "info", "subject": "discover" },
+    {
+      "ruleId": "degrade.silent",
+      "class": "risky",
+      "subject": "summarize_note@modern-minimal"
+    }
+  ],
+  "expectedVerdicts": {
+    "summarize_note": { "modern-minimal": "degraded-silent" },
+    "redact_note": { "modern-minimal": "declined-correctly" }
+  }
+}

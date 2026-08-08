@@ -46,15 +46,42 @@ export {
 } from "./core/assertions.js";
 export {
   CheckOutputSchema,
+  CompatSectionSchema,
   parseReportFormat,
   render,
   REPORT_FORMATS,
   summarize,
   type CheckOutput,
+  type CompatSection,
   type ReportFormat,
 } from "./core/report/report.js";
 export { ProbeSession, type RpcExchange } from "./core/session.js";
 export { shapeOf } from "./core/snapshot/shape.js";
+export {
+  COMPAT_CLASSES,
+  CompatFindingSchema,
+  CompatResultSchema,
+  DEGRADED_META_KEY,
+  ERAS,
+  runCompat,
+  VERDICTS,
+  type CompatClass,
+  type CompatEngineOptions,
+  type CompatFinding,
+  type CompatResult,
+  type CompatVerdict,
+  type Era,
+} from "./core/compat/engine.js";
+export {
+  analyzeXmcpHeaders,
+  type XhdrViolation,
+  type XmcpHeaderReport,
+} from "./core/compat/xhdr.js";
+export {
+  migrateSnapshotDocument,
+  MIGRATIONS,
+  type SnapshotMigration,
+} from "./core/snapshot/migrations/index.js";
 export {
   FORMAT_VERSION,
   RULESET_VERSION,

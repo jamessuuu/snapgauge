@@ -17,9 +17,9 @@ export const FORMAT_VERSION = 1;
 /**
  * Version of the diff-rule catalog baked into this build.
  * 1 = the six M1 walking-skeleton rules; 2 = the full SPEC §5 tier-table
- * taxonomy (M3).
+ * taxonomy (M3); 3 = + the T/X/D compat catalog (M4).
  */
-export const RULESET_VERSION = 2;
+export const RULESET_VERSION = 3;
 
 const Sha256HexSchema = z.string().regex(/^[0-9a-f]{64}$/, "sha-256 hex");
 const Iso8601Schema = z
@@ -35,6 +35,14 @@ export const SnapshotTargetSchema = z.strictObject({
 });
 export type SnapshotTarget = z.infer<typeof SnapshotTargetSchema>;
 
+/** Per-declaration x-mcp-header static analysis (SPEC §2/§5 X-group). */
+export const SnapshotXmcpHeaderSchema = z.strictObject({
+  path: z.string(),
+  header: z.string(),
+  valid: z.boolean(),
+  violations: z.array(z.string()),
+});
+
 export const SnapshotToolSchema = z.strictObject({
   name: z.string().min(1),
   title: z.string().optional(),
@@ -44,8 +52,8 @@ export const SnapshotToolSchema = z.strictObject({
   annotations: JsonObjectSchema.optional(),
   icons: z.array(JsonValueSchema).optional(),
   _meta: JsonObjectSchema.optional(),
-  // xmcpHeaders (per-tool x-mcp-header static analysis, SPEC §2/§5 X-group)
-  // lands with the compat engine at M4.
+  /** Present only when the tool declares x-mcp-header bindings. */
+  xmcpHeaders: z.array(SnapshotXmcpHeaderSchema).optional(),
 });
 export type SnapshotTool = z.infer<typeof SnapshotToolSchema>;
 

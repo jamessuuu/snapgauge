@@ -1,16 +1,21 @@
 /**
- * CLI target resolution: config entry -> live transport + probe spec +
- * snapshot target identity. The address policy default is `allow-private`
- * (a developer must be able to point snapgauge at localhost:3000);
- * `--strict-net` selects `public-only` (SPEC §3 Decision 4).
+ * CLI target resolution: config entry -> profile-aware transport factory +
+ * probe spec + snapshot target identity. The address policy default is
+ * `allow-private` (a developer must be able to point snapgauge at
+ * localhost:3000); `--strict-net` selects `public-only` (SPEC §3 D4).
  */
 import { SnapgaugeError } from "../core/errors.js";
-import { getProfile, type Profile } from "../core/profile.js";
+import { getProfile, profileNames, type Profile } from "../core/profile.js";
 import type { ProbeDecl, ProbeSpec } from "../core/snapshot/canonical.js";
 import type { SnapshotTarget } from "../core/snapshot/schema.js";
-import type { FixtureRawHandler, FixtureServer, Transport } from "../core/transport.js";
+import type {
+  FixtureRawHandler,
+  FixtureServer,
+  Transport,
+  TransportKind,
+} from "../core/transport.js";
 import { createFixtureTransport } from "../core/transport.js";
-import { authorizeTarget } from "../node/address-policy.js";
+import { authorizeTarget, type AuthorizedTarget } from "../node/address-policy.js";
 import { interpolateHeaders, type SnapgaugeConfig, type TargetConfig } from "../node/config.js";
 import { createHttpTransport } from "../node/http-transport.js";
 import { createStdioTransport } from "../node/stdio-transport.js";
@@ -56,9 +61,9 @@ export function pickTarget(
 }
 
 export interface ResolvedProfiles {
-  /** The primary profile — probes and headers run under it. */
+  /** The primary profile — recording probes run under it. */
   primary: Profile;
-  names: string[];
+  profiles: Profile[];
 }
 
 export function resolveProfiles(names: readonly string[] | undefined): ResolvedProfiles {
@@ -66,13 +71,16 @@ export function resolveProfiles(names: readonly string[] | undefined): ResolvedP
   const profiles = requested.map((name) => {
     const profile = getProfile(name);
     if (profile === undefined) {
-      throw new SnapgaugeError("USAGE", `unknown profile "${name}" (SPEC §5 built-ins)`);
+      throw new SnapgaugeError(
+        "USAGE",
+        `unknown profile "${name}" (built-ins: ${profileNames().join(", ")} — SPEC §5)`,
+      );
     }
     return profile;
   });
-  const [primary] = profiles;
+  const primary = profiles.find((p) => p.name === "modern-full") ?? profiles[0];
   if (primary === undefined) throw new SnapgaugeError("INTERNAL", "unreachable: empty profiles");
-  return { primary, names: requested };
+  return { primary, profiles };
 }
 
 export function normalizeProbes(
@@ -91,27 +99,40 @@ export function normalizeProbes(
   }));
 }
 
-export interface LiveTarget {
-  transport: Transport;
-  snapshotTarget: SnapshotTarget;
-  probeSpec: ProbeSpec;
-  profile: Profile;
-  volatile: readonly string[];
-  warnings: string[];
-}
-
 export interface BuildTargetOptions {
   strictNet?: boolean | undefined;
   timeoutMs?: number | undefined;
+  /** Override the config's profile list (compat --profiles). */
+  profileNames?: readonly string[] | undefined;
   env: Record<string, string | undefined>;
 }
 
-export async function buildLiveTarget(
+/**
+ * Everything check/record/compat need from a config target: identity, probe
+ * spec, and a per-profile transport factory (the compat engine opens one
+ * transport per profile and closes what it opens).
+ */
+export interface TargetFactory {
+  kind: TransportKind;
+  snapshotTarget: SnapshotTarget;
+  probeSpec: ProbeSpec;
+  primary: Profile;
+  profiles: Profile[];
+  volatile: readonly string[];
+  warnings: string[];
+  forProfile(profile: Profile): Promise<Transport> | Transport;
+  forProtocolVersion(version: string): Promise<Transport> | Transport;
+}
+
+export async function buildTargetFactory(
   target: TargetConfig,
   options: BuildTargetOptions,
-): Promise<LiveTarget> {
-  const { primary, names } = resolveProfiles(target.profiles);
-  const probeSpec: ProbeSpec = { probes: normalizeProbes(target.probes), profiles: names };
+): Promise<TargetFactory> {
+  const { primary, profiles } = resolveProfiles(options.profileNames ?? target.profiles);
+  const probeSpec: ProbeSpec = {
+    probes: normalizeProbes(target.probes),
+    profiles: profiles.map((p) => p.name),
+  };
   const timeoutMs = options.timeoutMs ?? target.timeoutMs ?? 10_000;
   const volatile = target.volatile ?? [];
   const protocolVersion = target.protocolVersion ?? primary.protocolVersion;
@@ -120,19 +141,23 @@ export async function buildLiveTarget(
     case "http": {
       const { headers, warnings } = interpolateHeaders(target.headers, options.env);
       const policy = options.strictNet === true ? "public-only" : "allow-private";
-      const authorized = await authorizeTarget(target.url, policy);
-      const transport = createHttpTransport({
-        url: authorized.url,
-        headers,
-        protocolVersion,
-        ...(authorized.pinnedAddress !== undefined
-          ? { pinnedAddress: authorized.pinnedAddress }
-          : {}),
-        timeoutMs,
-      });
+      // Authorize + resolve ONCE; every profile transport dials the same
+      // pinned address (SPEC §3 D4 — rebinding defense).
+      const authorized: AuthorizedTarget = await authorizeTarget(target.url, policy);
       const hasAuth = Object.keys(headers).some((h) => h.toLowerCase() === "authorization");
+      const httpTransport = (version: string, sendHeader: boolean): Transport =>
+        createHttpTransport({
+          url: authorized.url,
+          headers,
+          protocolVersion: version,
+          sendProtocolVersionHeader: sendHeader,
+          ...(authorized.pinnedAddress !== undefined
+            ? { pinnedAddress: authorized.pinnedAddress }
+            : {}),
+          timeoutMs,
+        });
       return {
-        transport,
+        kind: "http",
         snapshotTarget: {
           transport: "http",
           host: authorized.url.host,
@@ -141,19 +166,23 @@ export async function buildLiveTarget(
           auth: hasAuth ? "bearer(redacted)" : "none",
         },
         probeSpec,
-        profile: primary,
+        primary,
+        profiles,
         volatile,
         warnings,
+        forProfile: (profile) =>
+          httpTransport(
+            target.protocolVersion ?? profile.protocolVersion,
+            profile.sendProtocolVersionHeader !== false,
+          ),
+        forProtocolVersion: (version) => httpTransport(version, true),
       };
     }
     case "stdio": {
-      const transport = createStdioTransport({
-        command: target.command,
-        args: target.args ?? [],
-        timeoutMs,
-      });
+      const stdioTransport = (): Transport =>
+        createStdioTransport({ command: target.command, args: target.args ?? [], timeoutMs });
       return {
-        transport,
+        kind: "stdio",
         snapshotTarget: {
           transport: "stdio",
           host: target.command,
@@ -162,9 +191,12 @@ export async function buildLiveTarget(
           auth: "none",
         },
         probeSpec,
-        profile: primary,
+        primary,
+        profiles,
         volatile,
         warnings: [],
+        forProfile: () => stdioTransport(),
+        forProtocolVersion: () => stdioTransport(),
       };
     }
     case "fixture": {
@@ -176,10 +208,10 @@ export async function buildLiveTarget(
       // own declared probes (SPEC §7: the fixture knows its surface).
       const fixtureProbeSpec: ProbeSpec =
         target.probes === undefined
-          ? { probes: entry.probes, profiles: names }
+          ? { probes: entry.probes, profiles: probeSpec.profiles }
           : probeSpec;
       return {
-        transport: createFixtureTransport(entry.server, primary, entry.raw),
+        kind: "fixture",
         snapshotTarget: {
           transport: "fixture",
           host: target.fixture,
@@ -188,9 +220,13 @@ export async function buildLiveTarget(
           auth: "none",
         },
         probeSpec: fixtureProbeSpec,
-        profile: primary,
+        primary,
+        profiles,
         volatile,
         warnings: [],
+        forProfile: (profile) => createFixtureTransport(entry.server, profile, entry.raw),
+        forProtocolVersion: (version) =>
+          createFixtureTransport(entry.server, { ...primary, protocolVersion: version }, entry.raw),
       };
     }
   }

@@ -1,0 +1,23 @@
+{
+  "name": "nonconformant-legacy: pre-2026-07-28 server, era=legacy, ten T-group violations",
+  "description": "Mints Mcp-Session-Id, answers GET with an SSE stream (also serving Last-Event-ID resumption), implements initialize but not server/discover, ignores MCP-Name/version/Origin/_meta validation entirely, and omits resultType and cache hints. era is legacy because initialize answers and server/discover fails. get_not_405 is the lone SHOULD (risky); everything else that fails is a MUST (violation) — exit 3.",
+  "fixture": "nonconformant-legacy",
+  "profiles": ["modern-full"],
+  "expectedExit": 3,
+  "expectedEra": "legacy",
+  "expectedFindings": [
+    { "ruleId": "compat.era", "class": "info", "subject": "discover" },
+    { "ruleId": "transport.get_not_405", "class": "risky", "subject": "transport" },
+    { "ruleId": "transport.session_id_echoed", "class": "violation", "subject": "transport" },
+    { "ruleId": "transport.last_event_id_honored", "class": "violation", "subject": "transport" },
+    { "ruleId": "transport.header_body_mismatch_accepted", "class": "violation", "subject": "transport" },
+    { "ruleId": "transport.mcp_name_mismatch_accepted", "class": "violation", "subject": "transport" },
+    { "ruleId": "transport.unsupported_version_not_32022", "class": "violation", "subject": "transport" },
+    { "ruleId": "transport.origin_invalid_not_403", "class": "violation", "subject": "transport" },
+    { "ruleId": "transport.meta_missing_not_32602", "class": "violation", "subject": "transport" },
+    { "ruleId": "transport.discover_not_implemented", "class": "violation", "subject": "transport" },
+    { "ruleId": "transport.result_type_absent", "class": "violation", "subject": "transport" },
+    { "ruleId": "transport.cache_hints_missing", "class": "violation", "subject": "transport" }
+  ],
+  "expectedVerdicts": {}
+}

@@ -28,6 +28,7 @@ import {
   type SnapshotTool,
   type SnapshotV1,
 } from "./snapshot/schema.js";
+import { analyzeXmcpHeaders } from "./compat/xhdr.js";
 import { shapeOf } from "./snapshot/shape.js";
 import { sha256Hex } from "./sha256.js";
 import { ProbeSession, type RpcExchange } from "./session.js";
@@ -283,6 +284,10 @@ function captureBlock(block: Record<string, Json>, values: boolean): Json {
 }
 
 function toSnapshotTool(tool: WireTool): SnapshotTool {
+  // X-group static analysis is recorded per tool (SPEC §2 xmcpHeaders) —
+  // present only when the tool declares bindings, so binding-free snapshots
+  // stay noise-free.
+  const xmcpHeaders = analyzeXmcpHeaders(tool.inputSchema);
   return {
     name: tool.name,
     ...(tool.title !== undefined ? { title: tool.title } : {}),
@@ -292,6 +297,7 @@ function toSnapshotTool(tool: WireTool): SnapshotTool {
     ...(tool.annotations !== undefined ? { annotations: tool.annotations } : {}),
     ...(tool.icons !== undefined ? { icons: tool.icons } : {}),
     ...(tool._meta !== undefined ? { _meta: tool._meta } : {}),
+    ...(xmcpHeaders.length > 0 ? { xmcpHeaders } : {}),
   };
 }
 

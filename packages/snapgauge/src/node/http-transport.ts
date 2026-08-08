@@ -58,11 +58,17 @@ export function createHttpTransport(options: HttpTransportOptions): HttpTranspor
     bodyText: string | undefined,
     bufferStreams: boolean,
   ): Promise<RawHttpResponse> {
+    // Empty string = SUPPRESS the header (the assertion runner's convention
+    // for probing header-absence, SPEC §5 missing_protocol_version_accepted).
+    const effectiveHeaders: Record<string, string> = {};
+    for (const [name, value] of Object.entries(headers)) {
+      if (value !== "") effectiveHeaders[name] = value;
+    }
     let response: Dispatcher.ResponseData;
     try {
       response = await request(url, {
         method,
-        headers,
+        headers: effectiveHeaders,
         ...(bodyText !== undefined ? { body: bodyText } : {}),
         dispatcher: agent,
         signal: AbortSignal.timeout(timeoutMs),

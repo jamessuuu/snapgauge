@@ -1,0 +1,47 @@
+{
+  "name": "bad-x-mcp-header: seven tools, one violated X-group constraint each",
+  "description": "Static x-mcp-header analysis (SPEC §5 X-group): empty, control character, not an RFC 9110 token, duplicate binding (case-insensitive), non-primitive (number) type, unsafe integer range, and a declaration hidden behind oneOf (not statically reachable through properties keys only). Every hit is a violation — the tool is invisible to conforming clients.",
+  "fixture": "bad-x-mcp-header",
+  "profiles": ["modern-full"],
+  "expectedExit": 3,
+  "expectedEra": "modern-only",
+  "expectedFindings": [
+    { "ruleId": "compat.era", "class": "info", "subject": "discover" },
+    {
+      "ruleId": "xhdr.empty",
+      "class": "violation",
+      "subject": "tools.t_empty.inputSchema.properties.h"
+    },
+    {
+      "ruleId": "xhdr.control_char",
+      "class": "violation",
+      "subject": "tools.t_control.inputSchema.properties.h"
+    },
+    {
+      "ruleId": "xhdr.not_token",
+      "class": "violation",
+      "subject": "tools.t_not_token.inputSchema.properties.h"
+    },
+    {
+      "ruleId": "xhdr.not_unique",
+      "class": "violation",
+      "subject": "tools.t_dup.inputSchema.x-mcp-header.x-api-key"
+    },
+    {
+      "ruleId": "xhdr.non_primitive",
+      "class": "violation",
+      "subject": "tools.t_number.inputSchema.properties.h"
+    },
+    {
+      "ruleId": "xhdr.unsafe_integer",
+      "class": "violation",
+      "subject": "tools.t_unsafe.inputSchema.properties.h"
+    },
+    {
+      "ruleId": "xhdr.not_statically_reachable",
+      "class": "violation",
+      "subject": "tools.t_unreachable.inputSchema.properties.opts.oneOf.0.properties.key"
+    }
+  ],
+  "expectedVerdicts": {}
+}

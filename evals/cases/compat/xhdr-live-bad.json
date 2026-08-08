@@ -1,0 +1,22 @@
+{
+  "name": "xhdr-live-bad: both X-group LIVE checks violated",
+  "description": "The `region` argument is validly bound to X-Region (passes every static X-group check), but the live server accepts a call whose body argument disagrees with its header value instead of rejecting with -32020 (xhdr.param_mismatch_accepted), and separately rejects a call that omits the optional argument (and its header) with -32020 instead of allowing it (xhdr.absent_param_rejected).",
+  "fixture": "xhdr-live-bad",
+  "profiles": ["modern-full"],
+  "expectedExit": 3,
+  "expectedEra": "modern-only",
+  "expectedFindings": [
+    { "ruleId": "compat.era", "class": "info", "subject": "discover" },
+    {
+      "ruleId": "xhdr.param_mismatch_accepted",
+      "class": "violation",
+      "subject": "tools.lookup.inputSchema.properties.region"
+    },
+    {
+      "ruleId": "xhdr.absent_param_rejected",
+      "class": "violation",
+      "subject": "tools.lookup.inputSchema.properties.region"
+    }
+  ],
+  "expectedVerdicts": {}
+}

@@ -1,0 +1,25 @@
+{
+  "name": "degrader-liar: the director's edge case — both halves of a wrong degradation",
+  "description": "summarize_note gates on `sampling` at request entry with -32021, but never exercises sampling under modern-full (degrade.over_declared). confirm_delete unconditionally demands elicitation/create via resultType:\"input_required\" even from a client that advertised no capabilities at all (degrade.input_required_without_capability). Both are violations — exit 3, distinct from degrader-silent's exit 1.",
+  "fixture": "degrader-liar",
+  "profiles": ["modern-full", "modern-minimal"],
+  "expectedExit": 3,
+  "expectedEra": "modern-only",
+  "expectedFindings": [
+    { "ruleId": "compat.era", "class": "info", "subject": "discover" },
+    {
+      "ruleId": "degrade.over_declared",
+      "class": "violation",
+      "subject": "summarize_note@modern-minimal"
+    },
+    {
+      "ruleId": "degrade.input_required_without_capability",
+      "class": "violation",
+      "subject": "confirm_delete@modern-minimal"
+    }
+  ],
+  "expectedVerdicts": {
+    "summarize_note": { "modern-minimal": "violation" },
+    "confirm_delete": { "modern-minimal": "violation" }
+  }
+}

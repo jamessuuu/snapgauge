@@ -10,6 +10,8 @@
  * in the "safer-sounding" direction), which clients may act on by skipping
  * confirmations.
  */
+import { TRANSPORT_ASSERTIONS } from "../assertions.js";
+import { COMPAT_RULES } from "../compat/engine.js";
 import { jcsCanonical, type Json, type JsonObject } from "../json.js";
 import type { SnapshotTool, SnapshotV1 } from "../snapshot/schema.js";
 import type { Finding, Tier } from "./diff.js";
@@ -949,5 +951,39 @@ export function renderRulesDoc(): string {
     }
     lines.push("");
   }
+
+  lines.push("## Transport assertions (T-group, SPEC §5)");
+  lines.push("");
+  lines.push(
+    "HTTP-framing checks for the 2026-07-28 revision. On transports without",
+    "an HTTP layer each one is reported `n/a` WITH the reason — never",
+    "silently passed. Failing a MUST is a `violation` (exit 3); failing a",
+    "SHOULD is `risky`.",
+    "",
+  );
+  lines.push("| Assertion id | Level | Citation |");
+  lines.push("|---|---|---|");
+  for (const assertion of [...TRANSPORT_ASSERTIONS].sort((a, b) => compareStrings(a.id, b.id))) {
+    lines.push(
+      `| \`${assertion.id}\` | ${assertion.level} | ${assertion.cite.replaceAll("|", "\\|")} |`,
+    );
+  }
+  lines.push("");
+
+  lines.push("## Compat rules (X-group + D-group, SPEC §5)");
+  lines.push("");
+  lines.push(
+    "Degradation verdicts run per (tool × profile): `ok |",
+    "declined-correctly | degraded-reported | degraded-silent | violation`.",
+    "Any `violation`-class finding exits 3 — the server is wrong, not merely",
+    "different (different owner, different fix than exit 1).",
+    "",
+  );
+  lines.push("| Rule id | Class | What it means |");
+  lines.push("|---|---|---|");
+  for (const rule of [...COMPAT_RULES].sort((a, b) => compareStrings(a.id, b.id))) {
+    lines.push(`| \`${rule.id}\` | ${rule.class} | ${rule.summary.replaceAll("|", "\\|")} |`);
+  }
+  lines.push("");
   return `${lines.join("\n").trimEnd()}\n`;
 }

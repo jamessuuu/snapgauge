@@ -1,0 +1,20 @@
+{
+  "name": "degrader-honest: reports its degradation, declines the rest correctly",
+  "description": "summarize_note degrades under modern-minimal and marks the result with _meta[\"mcp/degraded\"] (degraded-reported, info); redact_note correctly declines with -32021 naming exactly the capability it demonstrably exercises under modern-full (declined-correctly, no finding). Neither is a violation nor risky — exit 0.",
+  "fixture": "degrader-honest",
+  "profiles": ["modern-full", "modern-minimal"],
+  "expectedExit": 0,
+  "expectedEra": "modern-only",
+  "expectedFindings": [
+    { "ruleId": "compat.era", "class": "info", "subject": "discover" },
+    {
+      "ruleId": "degrade.reported",
+      "class": "info",
+      "subject": "summarize_note@modern-minimal"
+    }
+  ],
+  "expectedVerdicts": {
+    "summarize_note": { "modern-minimal": "degraded-reported" },
+    "redact_note": { "modern-minimal": "declined-correctly" }
+  }
+}

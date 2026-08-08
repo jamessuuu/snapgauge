@@ -100,6 +100,14 @@ export function buildCleanProbes(): ProbeDecl[] {
   return [
     { id: "weather", tool: "get_weather", arguments: { location: "Seattle" }, capture: "shape" },
     { id: "weather-noargs", tool: "get_weather", arguments: {}, capture: "shape" },
+    // Exercises the valid x-mcp-header binding (the X-group live checks run
+    // against probed tools with valid bindings — SPEC §5).
+    {
+      id: "archive",
+      tool: "archive_note",
+      arguments: { id: "n1", workspace: "acme" },
+      capture: "shape",
+    },
   ];
 }
 

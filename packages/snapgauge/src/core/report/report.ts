@@ -8,6 +8,7 @@
  */
 import { z } from "zod";
 import { AssertionReportSchema, type AssertionReport } from "../assertions.js";
+import { CompatFindingSchema, ERAS, VERDICTS } from "../compat/engine.js";
 import { FindingSchema, TIERS, type Finding, type Tier } from "../diff/diff.js";
 import { SnapgaugeError } from "../errors.js";
 
@@ -32,6 +33,15 @@ const SummarySchema = z.strictObject({
   cosmetic: z.number().int().nonnegative(),
 });
 
+/** The compat matrix as it appears inside a check/compat result (SPEC §5). */
+export const CompatSectionSchema = z.strictObject({
+  era: z.enum(ERAS),
+  profiles: z.array(z.string()),
+  findings: z.array(CompatFindingSchema),
+  verdicts: z.record(z.string(), z.record(z.string(), z.enum(VERDICTS))),
+});
+export type CompatSection = z.infer<typeof CompatSectionSchema>;
+
 /**
  * The Result shape `check` emits (and `report` re-parses). `diff`'s leaner
  * DiffOutput is upgraded into this shape by `fromDiffOutput`.
@@ -48,6 +58,7 @@ export const CheckOutputSchema = z.strictObject({
   summary: SummarySchema,
   gate: z.strictObject({ failOn: z.enum(TIERS), failed: z.boolean() }),
   assertions: z.array(AssertionReportSchema).optional(),
+  compat: CompatSectionSchema.optional(),
   /** SPEC §6: missing evidence — the gate treats this as not passing (exit 2). */
   incomplete: z.boolean().optional(),
   updated: z.boolean().optional(),
@@ -96,6 +107,9 @@ function renderText(output: CheckOutput): string[] {
       );
     }
   }
+  if (output.compat !== undefined) {
+    lines.push(...renderCompatText(output.compat));
+  }
   const { summary } = output;
   const counts = `${String(summary.breaking)} breaking, ${String(summary.risky)} risky, ${String(summary.compatible)} compatible, ${String(summary.cosmetic)} cosmetic`;
   const verdict = describeExit(output);
@@ -109,6 +123,27 @@ function renderText(output: CheckOutput): string[] {
   }
   if (output.updated === true) {
     lines.push("snapshot updated (--update)");
+  }
+  return lines;
+}
+
+function renderCompatText(compat: CompatSection): string[] {
+  const lines: string[] = [];
+  lines.push(`compat: era=${compat.era}; profiles=${compat.profiles.join(", ")}`);
+  for (const finding of compat.findings) {
+    lines.push(`  ${finding.class.padEnd(10)} ${finding.ruleId.padEnd(42)} ${finding.subject} — ${finding.message}`);
+  }
+  const tools = Object.keys(compat.verdicts).sort();
+  if (tools.length > 0) {
+    lines.push("  verdicts (tool x profile):");
+    for (const tool of tools) {
+      const row = compat.verdicts[tool] ?? {};
+      const cells = Object.keys(row)
+        .sort()
+        .map((profile) => `${profile}=${row[profile] ?? "?"}`)
+        .join("  ");
+      lines.push(`    ${tool.padEnd(24)} ${cells}`);
+    }
   }
   return lines;
 }
@@ -148,6 +183,14 @@ function renderGithub(output: CheckOutput): string[] {
       );
     }
   }
+  for (const finding of output.compat?.findings ?? []) {
+    if (finding.ruleId.startsWith("transport.")) continue; // already annotated above
+    const kind =
+      finding.class === "violation" ? "error" : finding.class === "risky" ? "warning" : "notice";
+    lines.push(
+      `::${kind} title=${ghProperty(`compat: ${finding.ruleId}`)}::${ghMessage(`${finding.subject} — ${finding.message}`)}`,
+    );
+  }
   // Human-readable tail — visible in the raw log under the annotations.
   lines.push(...renderText(output));
   return lines;
@@ -177,6 +220,20 @@ function renderMarkdown(output: CheckOutput): string[] {
       lines.push(
         `| \`${assertion.id}\` | ${assertion.level} | ${assertion.verdict} | ${mdEscape(assertion.detail)} |`,
       );
+    }
+  }
+  if (output.compat !== undefined) {
+    lines.push("");
+    lines.push(`Compat era: **${output.compat.era}** (profiles: ${output.compat.profiles.join(", ")})`);
+    if (output.compat.findings.length > 0) {
+      lines.push("");
+      lines.push("| class | rule | subject | message |");
+      lines.push("|---|---|---|---|");
+      for (const finding of output.compat.findings) {
+        lines.push(
+          `| ${finding.class} | \`${finding.ruleId}\` | \`${finding.subject}\` | ${mdEscape(finding.message)} |`,
+        );
+      }
     }
   }
   lines.push("");

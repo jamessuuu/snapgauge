@@ -76,7 +76,7 @@ export type FixtureEntry = {
 };
 
 export function makeServer(surface: SurfaceDef): FixtureServer {
-  return (request: JsonRpcRequest, profile): FixtureResponse => {
+  return (request: JsonRpcRequest, profile, headers): FixtureResponse => {
     switch (request.method) {
       case "server/discover":
         return ok(request, {
@@ -94,7 +94,14 @@ export function makeServer(surface: SurfaceDef): FixtureServer {
           cacheScope: surface.cacheScope,
         });
       case "tools/call":
-        return handleToolCall(surface, request, profile);
+        return handleToolCall(surface, request, profile, headers);
+      case "initialize":
+        // Modern-only fixtures reject legacy initialize the HELPFUL way:
+        // naming their supported versions (SPEC §5
+        // compat.legacy_error_unhelpful is the server that does not).
+        return rpcError(request, -32601, "initialize is a legacy method; this server is modern-only", {
+          supported: surface.supportedVersions,
+        });
       default:
         return rpcError(request, -32601, `method not found: ${request.method}`);
     }
@@ -105,6 +112,7 @@ function handleToolCall(
   surface: SurfaceDef,
   request: JsonRpcRequest,
   profile: Profile,
+  headers?: Record<string, string>,
 ): FixtureResponse {
   const params = request.params;
   if (params === undefined || typeof params.name !== "string") {
@@ -120,6 +128,22 @@ function handleToolCall(
     return rpcError(request, -32602, `unknown tool: ${params.name}`);
   }
   const args = isObject(params.arguments) ? params.arguments : {};
+  // Conformant x-mcp-header handling (SPEC §5 X-group live checks): a bound
+  // parameter present in BOTH body and header with different values MUST be
+  // rejected with -32020; an absent value must never demand its header.
+  const lowered: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers ?? {})) {
+    if (value !== "") lowered[name.toLowerCase()] = value;
+  }
+  for (const [property, schema] of Object.entries(tool.inputSchema.properties)) {
+    const bound = schema["x-mcp-header"];
+    if (typeof bound !== "string" || bound === "") continue;
+    const headerValue = lowered[bound.toLowerCase()];
+    const argString = primitiveString(args[property]);
+    if (argString !== undefined && headerValue !== undefined && argString !== headerValue) {
+      return rpcError(request, -32020, `header ${bound} disagrees with argument "${property}"`);
+    }
+  }
   for (const required of tool.inputSchema.required ?? []) {
     if (!(required in args)) {
       return rpcError(
@@ -151,6 +175,14 @@ function handleToolCall(
 
 function isObject(value: Json | undefined): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Only primitives round-trip through a header value — objects/arrays never
+ * do (x-mcp-header bindings are constrained to string|boolean|integer). */
+function primitiveString(value: Json | undefined): string | undefined {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return undefined;
 }
 
 function toolJson(tool: ToolDef): Json {
@@ -261,6 +293,16 @@ export function makeRawHandler(server: FixtureServer, surface: SurfaceDef): Fixt
     ) {
       return jsonError(400, body.id, -32020, "MCP-Protocol-Version disagrees with the body");
     }
+    // subscriptions/listen: a genuine SSE stream (SPEC §5 sse_no_accel_buffering
+    // / sse_no_keepalive) — a periodic ": " comment IS the keepalive, and
+    // X-Accel-Buffering: no defeats proxy buffering of the long-lived stream.
+    if (body.method === "subscriptions/listen" && headers.accept?.includes("text/event-stream") === true) {
+      return {
+        status: 200,
+        headers: { "content-type": "text/event-stream", "x-accel-buffering": "no" },
+        bodyText: ": keepalive\n\nevent: message\ndata: {}\n\n",
+      };
+    }
     // Mcp-Session-Id MUST be ignored: never echoed, never minted.
     const rpcRequest = body as unknown as JsonRpcRequest;
     const response = server(rpcRequest, profile, headers);
@@ -283,7 +325,10 @@ function isLocalOrigin(origin: string): boolean {
 
 function lowercaseHeaders(headers: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const [name, value] of Object.entries(headers)) out[name.toLowerCase()] = value;
+  for (const [name, value] of Object.entries(headers)) {
+    if (value === "") continue; // empty = suppressed header (absence probe)
+    out[name.toLowerCase()] = value;
+  }
   return out;
 }
 

@@ -64,3 +64,65 @@ surface a model routes on. Default gate: `failOn: "risky"`.
 | `serverInfo.version.changed` | serverInfo.version changed — releases are expected to happen. |
 | `text.whitespace-only` | A description/title/instructions change that is whitespace-only — the one text change that IS cosmetic. |
 | `tool.icons.changed` | Tool icons changed. |
+
+## Transport assertions (T-group, SPEC §5)
+
+HTTP-framing checks for the 2026-07-28 revision. On transports without
+an HTTP layer each one is reported `n/a` WITH the reason — never
+silently passed. Failing a MUST is a `violation` (exit 3); failing a
+SHOULD is `risky`.
+
+| Assertion id | Level | Citation |
+|---|---|---|
+| `transport.cache_hints_missing` | MUST | utilities/caching 2026-07-28: cacheable surfaces MUST carry ttlMs>=0 + cacheScope |
+| `transport.cachescope_inconsistent_across_pages` | MUST | utilities/caching 2026-07-28: cacheScope MUST be identical on every page of a paginated list |
+| `transport.delete_not_405` | SHOULD | streamable-http: a server SHOULD respond 405 to DELETE on the MCP endpoint |
+| `transport.discover_not_implemented` | MUST | server/discover 2026-07-28: servers MUST implement server/discover |
+| `transport.get_not_405` | SHOULD | streamable-http: a server SHOULD respond 405 to GET on the MCP endpoint |
+| `transport.header_body_mismatch_accepted` | MUST | versioning 2026-07-28: header/body protocol-version disagreement MUST be 400 + -32020 HeaderMismatch |
+| `transport.last_event_id_honored` | MUST | streamable-http 2026-07-28: streams are not resumable — Last-Event-ID MUST NOT resume a stream |
+| `transport.mcp_name_base64_not_decoded` | MUST | streamable-http 2026-07-28: the =?base64?…?= MCP-Name sentinel MUST be decoded before comparing |
+| `transport.mcp_name_mismatch_accepted` | MUST | streamable-http 2026-07-28: a mismatched MCP-Name MUST be rejected (-32020) |
+| `transport.mcp_name_missing_accepted` | MUST | streamable-http 2026-07-28: a request without MCP-Name MUST be accepted |
+| `transport.meta_missing_not_32602` | MUST | server/tools 2026-07-28: tools/call without required _meta MUST be -32602 (or HTTP 400) |
+| `transport.missing_protocol_version_accepted` | MUST | versioning 2026-07-28: a request without MCP-Protocol-Version MUST be accepted |
+| `transport.notification_not_202` | MUST | streamable-http: a lone notification MUST be answered 202 Accepted |
+| `transport.origin_invalid_not_403` | MUST | streamable-http: an invalid Origin MUST be rejected 403 (DNS-rebinding defense) |
+| `transport.reserved_error_code_misuse` | MUST | basic 2026-07-28: -32020..-32099 is spec-reserved; -32002/-32042 MUST NOT be emitted |
+| `transport.result_type_absent` | MUST | server/tools 2026-07-28: tool results MUST carry resultType |
+| `transport.session_id_echoed` | MUST | streamable-http 2026-07-28: servers MUST ignore Mcp-Session-Id — never mint or echo one |
+| `transport.sse_no_accel_buffering` | SHOULD | streamable-http: SSE responses SHOULD carry X-Accel-Buffering: no |
+| `transport.sse_no_keepalive` | SHOULD | streamable-http: long-lived SSE streams SHOULD send keepalive comments |
+| `transport.unknown_method_not_404_32601` | MUST | basic: an unknown method MUST yield JSON-RPC -32601, not HTTP 404 |
+| `transport.unsupported_version_not_32022` | MUST | versioning 2026-07-28: an unsupported version MUST be -32022 with non-empty data.supported[] |
+
+## Compat rules (X-group + D-group, SPEC §5)
+
+Degradation verdicts run per (tool × profile): `ok |
+declined-correctly | degraded-reported | degraded-silent | violation`.
+Any `violation`-class finding exits 3 — the server is wrong, not merely
+different (different owner, different fix than exit 1).
+
+| Rule id | Class | What it means |
+|---|---|---|
+| `compat.era` | info | Informational: modern-only \| dual \| legacy, from the modern-then-initialize probe. |
+| `compat.legacy_error_unhelpful` | risky | A modern-only server rejects initialize without naming its supported versions (SHOULD; legacy clients have no fall-forward). |
+| `compat.set_varies_per_connection` | violation | Same profile, two fresh connections, different tool set (MUST NOT). |
+| `compat.surface_varies_by_version` | info | The tool-name set differs across advertised versions (recorded as a matrix, reported, not failed). |
+| `compat.ttl_overpromise` | risky | The surface changed between two recorded runs closer together than the ttlMs the server told clients to cache for. Requires the board's time series (M6) — not evaluated by the engine. |
+| `compat.version_advertised_unsupported` | violation | A version listed in discover.supportedVersions fails a plain tools/list — the server is lying about what it supports. |
+| `degrade.extension_leak` | violation | An advertised extension's resultType or _meta prefix appears in a response to a profile that advertised no extensions. |
+| `degrade.input_required_without_capability` | violation | resultType:"input_required" whose inputRequests name elicitation/create, sampling/createMessage or roots/list to a client that advertised none. |
+| `degrade.over_declared` | violation | -32021 naming a capability the tool demonstrably never exercises under modern-full — the server gates at request entry rather than at use. |
+| `degrade.reported` | info | The good citizen: the result degrades under the reduced profile AND says so via the degradation marker. |
+| `degrade.silent` | risky | A complete result under the reduced profile that differs in shape from modern-full with no signal at all. Permitted by the spec, so reported at risky — exactly what the board exists to publish. |
+| `degrade.wrong_error` | violation | Under a reduced profile a call must succeed with resultType:"complete" or fail with -32021 listing exactly the missing capabilities. A 500, a generic -32603, a hang, or an isError:true text blob is a violation. |
+| `xhdr.absent_param_rejected` | violation | Live check: the server MUST NOT expect a header for an absent value. |
+| `xhdr.control_char` | violation | x-mcp-header contains a control character — invisible to conforming clients. |
+| `xhdr.empty` | violation | x-mcp-header is empty — the tool is invisible to conforming clients. |
+| `xhdr.non_primitive` | violation | The bound value is not a primitive (`number` is not permitted) — invisible to conforming clients. |
+| `xhdr.not_statically_reachable` | violation | The declaration chain is not properties keys only (items/oneOf/anyOf/allOf/not/if-then-else/$ref) — invisible to conforming clients. |
+| `xhdr.not_token` | violation | x-mcp-header is not an RFC 9110 token (1*tchar) — invisible to conforming clients. |
+| `xhdr.not_unique` | violation | The same header (case-insensitive) is bound more than once — invisible to conforming clients. |
+| `xhdr.param_mismatch_accepted` | violation | Live check: a call whose bound param disagrees with its header MUST be rejected with -32020. |
+| `xhdr.unsafe_integer` | violation | An integer binding involves values outside the safe-integer range — invisible to conforming clients. |

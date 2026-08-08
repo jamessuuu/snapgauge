@@ -76,10 +76,13 @@ describe("snapgauge CLI — usage errors (exit 4, SPEC §5)", () => {
   });
 
   it("record with an unknown profile", async () => {
+    // "modern-minimal" is a real M4 built-in (SPEC §5) — use a name that is
+    // still not one of the nine built-ins to keep testing unknown-profile
+    // rejection.
     const { io } = capture();
     expect(
       await runCli(
-        ["record", "a", "--fixture", "clean@v1", "--profile", "modern-minimal", "--dir", tempDir()],
+        ["record", "a", "--fixture", "clean@v1", "--profile", "no-such-profile", "--dir", tempDir()],
         io,
       ),
     ).toBe(EXIT.USAGE);
