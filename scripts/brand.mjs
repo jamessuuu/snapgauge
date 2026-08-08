@@ -132,22 +132,30 @@ const GLYPHS = {
       `<rect x="14" y="40" width="6" height="6" fill="${AMBER}"/>`,
     ].join(""),
 
-  /** snapgauge — a snap gauge's jaws closing on a part; amber jaw tip. */
+  /**
+   * snapgauge — a C-frame gauge with two jaws closing on a part.
+   * Redrawn 2026-08-09: the first attempt (an outline frame with two thin
+   * arms) rendered as an ambiguous box at 64px and as noise at 16px. Verified
+   * by rasterising and LOOKING, which is the only way this class of failure
+   * is ever caught. This version reads as a grip: a heavy C spine on the
+   * left, two solid jaws closing from above and below, and the part between
+   * them with the amber contact where the upper jaw lands.
+   */
   snapgauge: () =>
     [
-      // the part under test
-      `<rect x="26" y="24" width="12" height="16" fill="none" stroke="${INK}" stroke-width="${SW}"/>`,
-      // gauge frame
-      `<path d="M10 12 H54" fill="none" stroke="${INK}" stroke-width="${SW}"/>`,
-      // upper jaw
-      `<path d="M18 12 V24 H26" fill="none" stroke="${INK}" stroke-width="${SW}"/>`,
-      // lower jaw arm
-      `<path d="M46 12 V40 H38" fill="none" stroke="${INK}" stroke-width="${SW}"/>`,
-      // go / no-go tick marks on the frame
-      `<path d="M14 12 V6" fill="none" stroke="${INK}" stroke-width="${SWH}"/>`,
-      `<path d="M50 12 V6" fill="none" stroke="${INK}" stroke-width="${SWH}"/>`,
-      // THE CONTACT POINT — amber where the jaw meets the part
-      `<rect x="23" y="21" width="5" height="5" fill="${AMBER}"/>`,
+      // the C-frame spine
+      `<path d="M12 14 V50" fill="none" stroke="${INK}" stroke-width="${(G * 0.078).toFixed(3)}"/>`,
+      // upper jaw — solid, reaching right
+      `<rect x="12" y="14" width="30" height="7" fill="${INK}"/>`,
+      // lower jaw — solid, reaching right
+      `<rect x="12" y="43" width="30" height="7" fill="${INK}"/>`,
+      // the part being measured, held between the jaws
+      `<rect x="26" y="25" width="14" height="14" fill="none" stroke="${INK}" stroke-width="${SW}"/>`,
+      // go / no-go reference ticks off the open side
+      `<path d="M50 21 H58" fill="none" stroke="${INK}" stroke-width="${SWH}"/>`,
+      `<path d="M50 43 H58" fill="none" stroke="${INK}" stroke-width="${SWH}"/>`,
+      // THE CONTACT — amber, where the upper jaw meets the part
+      `<rect x="29" y="21" width="8" height="5" fill="${AMBER}"/>`,
     ].join(""),
 
   /** chaff — the sieve line: grain stays, chaff lifts away; topmost fragment amber. */
