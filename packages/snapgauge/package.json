@@ -1,6 +1,6 @@
 {
   "name": "snapgauge",
-  "version": "0.1.0-alpha.0",
+  "version": "1.0.0-rc.1",
   "description": "Contract tests for MCP servers: record a snapshot of a server's schema and observable behavior; fail CI when the next version moves.",
   "license": "MIT",
   "author": "James Lorenz Santos",

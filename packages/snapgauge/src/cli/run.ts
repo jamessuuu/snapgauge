@@ -191,15 +191,16 @@ export async function runCli(
 
   program
     .command("ci")
-    .description("alias for check --reporter=github --fail-on=risky --summary (SPEC §4)")
+    .description("alias for check --reporter=github --fail-on=risky --summary (SPEC §4); --fail-on overrides the default")
     .argument("[target]", "target name (config key)")
     .option("--config <path>", "config file")
+    .option("--fail-on <tier>", `gate tier (${TIERS.join("|")}); default risky`)
     .option("--timeout <ms>", "per-request timeout override")
     .option("--strict-net", "address policy public-only")
     .action(async (target: string | undefined, options: CheckCommandOptions) => {
       code = await checkCommand(
         target,
-        { ...options, reporter: "github", failOn: "risky", summary: true },
+        { ...options, reporter: "github", failOn: options.failOn ?? "risky", summary: true },
         io,
         ctx,
       );

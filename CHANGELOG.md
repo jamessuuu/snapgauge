@@ -5,7 +5,43 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: se
 
 ## [Unreleased]
 
+## [1.0.0-rc.1] - 2026-08-09
+
 ### Added
+- M7 (publish readiness, SPEC §10): root [`action.yml`](action.yml) — a
+  composite GitHub Action running `snapgauge check` and reusing the
+  already-tested `snapgauge report` renderer (offline, one live check per
+  run, not two) to emit GitHub Actions annotations plus a job-summary table;
+  inputs `config`/`fail-on`/`target`/`version`, output `exit-code`. Extended
+  the `ci` alias with an optional `--fail-on` override (previously
+  hardcoded to `risky` with no way to change it — needed to make the
+  Action's `fail-on` input do anything). Verified against a scratch
+  consumer workflow (`uses: ./`, not committed — deliberately temporary
+  per its own description) and, independently, by hand-running every shell
+  step the Action performs against a real drifted fixture pair, confirming
+  the captured exit code (1), the annotation lines, and the job-summary
+  markdown table all match. `.github/workflows/release.yml`: tag-triggered
+  (`v*`), full CI gate + a tag-vs-`package.json` version check before
+  `pnpm publish --access public --provenance`; committed but never
+  triggered or dry-run against the real registry — publishing stays
+  James's call. `scripts/pack-check.mjs` now does the thing its own
+  original comment described but didn't yet do: after the exports/bin
+  inspection, it `npm install`s the packed tarball into a clean scratch
+  directory (no workspace symlinks, no hoisted devDependencies) and runs
+  the INSTALLED bin's `snapgauge diff` against two snapshots recorded with
+  the monorepo's own build (`clean@v1` vs `drift-breaking@v2` — the same
+  pair the golden eval set uses for its planted-breaking-drift case),
+  asserting the exact expected exit code and finding. This is the one
+  check the exports/bin inspection alone could not do: it proves the
+  tarball's `files` entry ships everything the CLI needs at runtime,
+  including real (non-hoisted) dependency resolution for commander/undici/
+  zod. README gained the exit-code table's "who fixes it" column, the full
+  4-row official-conformance-vs-snapgauge positioning table (previously
+  2 rows), a Limitations section, a link to the official conformance repo,
+  an install/usage section (CLI + Action), and an explicit "SHARP TOOL"
+  statement — SPEC §9's positioning acceptance criteria. Version bumped to
+  `1.0.0-rc.1` (from `0.1.0-alpha.0`) in `packages/snapgauge/package.json`
+  and `SNAPGAUGE_VERSION`.
 - M6 (the board, SPEC §8/§10): `boards/<YYYY-MM-DD>.json` + `boards/roster.json`
   Zod schemas (`packages/snapgauge/src/core/board/schema.ts`) — the roster
   is structurally narrower than a full config target (no `headers`, no

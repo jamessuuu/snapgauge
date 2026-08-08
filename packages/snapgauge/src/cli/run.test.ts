@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { DiffOutputSchema } from "../core/diff/diff.js";
 import { EXIT } from "../core/errors.js";
+import { SNAPGAUGE_VERSION } from "../core/version.js";
 import { readSnapshotFile } from "../node/snapshot-io.js";
 import { runCli, type CliIo } from "./run.js";
 
@@ -131,7 +132,7 @@ describe("snapgauge CLI — usage errors (exit 4, SPEC §5)", () => {
     expect(await runCli(["--help"], help.io)).toBe(EXIT.CLEAN);
     const version = capture();
     expect(await runCli(["--version"], version.io)).toBe(EXIT.CLEAN);
-    expect(version.out.join("\n")).toContain("0.1.0-alpha.0");
+    expect(version.out.join("\n")).toContain(SNAPGAUGE_VERSION);
   });
 });
 
@@ -270,6 +271,22 @@ describe("snapgauge check / ci over config fixture targets (SPEC §4)", () => {
     const text = out.join("\n");
     expect(text).toContain("::error title=");
     expect(text).toContain("tool.removed");
+  });
+
+  it("ci --fail-on overrides the default risky gate (action.yml's fail-on input, SPEC §10 M7)", async () => {
+    const dir = tempDir();
+    writeFixtureConfig(dir, "clean@v1");
+    expect(await runCli(["record", "fix"], capture().io, { cwd: dir, env: {} })).toBe(EXIT.CLEAN);
+    writeFixtureConfig(dir, "drift-cosmetic@v2");
+    // Default risky gate: a cosmetic-only drift stays below it (exit 0).
+    const defaultGate = capture();
+    expect(await runCli(["ci"], defaultGate.io, { cwd: dir, env: {} })).toBe(EXIT.CLEAN);
+    // --fail-on cosmetic tightens the gate to catch it.
+    const tightened = capture();
+    expect(await runCli(["ci", "--fail-on", "cosmetic"], tightened.io, { cwd: dir, env: {} })).toBe(
+      EXIT.DRIFT,
+    );
+    expect(tightened.out.join("\n")).toContain("::notice title=");
   });
 
   it("--ignore drops a rule before gating; --only filters tiers", async () => {

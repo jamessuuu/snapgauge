@@ -1,0 +1,59 @@
+name: release
+
+# Publishes `snapgauge` to npm (SPEC §3: the only published package) on a
+# `v*` tag push. NEVER run by this build — tags are pushed by James, not by
+# an automated commit, and this workflow is committed but has not been
+# triggered or dry-run against the real npm registry.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  # OIDC token for `npm publish --provenance` (SPEC §10 M7) — no long-lived
+  # npm token is exchanged for the signing identity itself; NPM_TOKEN below
+  # is still required for registry AUTH (npm's provenance and auth are
+  # separate concerns), scoped to publish-only.
+  id-token: write
+
+jobs:
+  release:
+    if: github.repository == 'jamessuuu/snapgauge'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: "https://registry.npmjs.org"
+
+      - run: pnpm install --frozen-lockfile
+
+      # The full gate, unabridged (PROGRAM.md D6 / SPEC §7) — a release
+      # workflow that skips its own CI would defeat the point of the gate.
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test -- --project unit
+      - run: pnpm test -- --project eval
+      - run: pnpm build
+      - run: pnpm ci:pack-check
+
+      # The tag and package.json must agree — a tag typo must never publish
+      # the wrong version silently.
+      - name: verify tag matches package.json version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION=$(node -p "require('./packages/snapgauge/package.json').version")
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "tag $GITHUB_REF_NAME (version $TAG_VERSION) does not match packages/snapgauge/package.json version $PKG_VERSION" >&2
+            exit 1
+          fi
+
+      - name: publish snapgauge
+        working-directory: packages/snapgauge
+        run: pnpm publish --access public --provenance --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

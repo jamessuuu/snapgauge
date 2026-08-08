@@ -1,0 +1,102 @@
+name: "snapgauge"
+description: >-
+  Contract tests for MCP servers — record a snapshot of a server's schema and
+  observable behavior, fail CI when the next version moves. Runs
+  `snapgauge check` against a committed `.snapgauge/<target>.snapshot.json`
+  and surfaces every finding as a GitHub Actions annotation plus a job
+  summary table.
+author: "James Lorenz Santos"
+branding:
+  icon: "activity"
+  color: "gray-dark"
+
+inputs:
+  config:
+    description: >-
+      Path to snapgauge.config.json (or .mjs/.ts), relative to the workflow's
+      working directory.
+    required: false
+    default: "snapgauge.config.json"
+  fail-on:
+    description: >-
+      Gate tier: breaking | risky | compatible | cosmetic (SPEC §5). A
+      finding at or above this tier fails the step.
+    required: false
+    default: "risky"
+  target:
+    description: >-
+      Target name (the config's key under "targets") to check. Leave empty
+      when the config declares exactly one target.
+    required: false
+    default: ""
+  version:
+    description: >-
+      snapgauge npm dist-tag or version, run via `npx` — no install step
+      required in the consuming workflow.
+    required: false
+    default: "1"
+
+outputs:
+  exit-code:
+    description: >-
+      The snapgauge exit code (SPEC §5): 0 clean, 1 drift at/above the gate,
+      2 probe/connection failure, 3 compat/degradation violation, 4
+      usage/config/snapshot-format error, 5 internal error. 1 vs 3 is
+      deliberate — different owner, different fix.
+    value: ${{ steps.check.outputs.exit-code }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 24
+
+    - name: snapgauge check
+      id: check
+      shell: bash
+      # `set +e` + a deferred `exit "$code"` at the very end: the annotations
+      # and job-summary steps below MUST still run on a failing gate (that is
+      # the whole point of the finding) — a normal `run:` failure here would
+      # skip them.
+      run: |
+        set +e
+        ARGS=(check)
+        if [ -n "${{ inputs.target }}" ]; then
+          ARGS+=("${{ inputs.target }}")
+        fi
+        ARGS+=(--config "${{ inputs.config }}" --fail-on "${{ inputs.fail-on }}" --json)
+        npx --yes "snapgauge@${{ inputs.version }}" "${ARGS[@]}" > snapgauge-result.json
+        code=$?
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        exit 0
+
+    - name: annotations
+      shell: bash
+      # `report --format github` is the SAME renderer `snapgauge ci` uses
+      # (packages/snapgauge/src/core/report/report.ts, well-tested — see
+      # RULES.md/golden set) — reused here rather than reimplemented, run
+      # OFFLINE against the JSON already captured above (no second live
+      # check against the target). Emits `::error/warning/notice title=…::…`
+      # workflow commands, which GitHub recognizes from plain stdout with no
+      # extra wiring. `file=`/`line=`/`col=` are deliberately NOT populated:
+      # a finding's location is a JSON path into the target's schema
+      # (`subject`, e.g. `tools.get_weather.description`), never a source
+      # file position — fabricating one would be exactly the kind of guess
+      # this project's findings are designed never to make (SPEC §8's
+      # "neutral observations, never guessed" standard extends here too).
+      run: npx --yes "snapgauge@${{ inputs.version }}" report snapgauge-result.json --format github
+
+    - name: job summary
+      shell: bash
+      run: npx --yes "snapgauge@${{ inputs.version }}" report snapgauge-result.json --format md >> "$GITHUB_STEP_SUMMARY"
+
+    - name: gate
+      shell: bash
+      run: |
+        code="${{ steps.check.outputs.exit-code }}"
+        if [ "$code" != "0" ]; then
+          echo "snapgauge exited $code — see the annotations above and the job summary" >&2
+          exit "$code"
+        fi
