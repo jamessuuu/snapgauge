@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 /** BRAND-KIT.md requirement: footer + favicon identically on every page. */
-const ROUTES = ["/", "/demo", "/live", "/board"];
+const ROUTES = ["/", "/demo", "/live", "/board", "/docs"];
 
 for (const route of ROUTES) {
   test(`footer attribution + favicon present on ${route}`, async ({ page }) => {

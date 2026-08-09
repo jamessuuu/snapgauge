@@ -45,3 +45,13 @@ jobs:
         # criterion, BRAND-KIT.md) — regenerate and fail if committed
         # apps/web/public/brand/* differs from the generator's output.
         run: pnpm ci:brand-check
+      - name: diagram drift
+        # scripts/diagram.mjs is deterministic (DESIGN-DIRECTION.md's tier
+        # ladder, same house line language as brand.mjs) — regenerate and
+        # fail if the committed SVG differs from the generator's output.
+        run: pnpm ci:diagram-check
+      - name: docs drift
+        # docs/RULES.md and apps/web/src/generated/rules-catalog.ts are both
+        # generated from the same diff-rule registry — regenerate and fail
+        # on drift, same pattern as brand/diagram.
+        run: pnpm ci:docs-check

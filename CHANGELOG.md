@@ -5,6 +5,44 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: se
 
 ## [Unreleased]
 
+### Added
+- Design + documentation pass (DESIGN-DIRECTION.md). `scripts/diagram.mjs`:
+  a deterministic mechanism diagram — the four diff tiers as a ladder, each
+  rung carrying one real rule id looked up in the built registry (the same
+  four ids the `clean@v1` → `drift-breaking@v2` fixture pair actually
+  produces), `risky` the one amber rung. `pnpm diagram` regenerates it;
+  `pnpm ci:diagram-check` fails CI on drift, next to the existing brand-drift
+  stage. `scripts/generate-rules.mjs` now also emits
+  `apps/web/src/generated/rules-catalog.ts` (the same registry as plain data,
+  drift-checked via `pnpm ci:docs-check`) so `/docs` can render the full
+  rule catalog without deep-importing package internals.
+- `apps/web/public/demo/snapgauge-{demo.webm,poster.png}`: a Playwright
+  recording of the deployed site (`scripts/record-demo.mjs`, `/demo`,
+  selecting `drift-breaking@v2` and running it), embedded on `/` via
+  `src/components/demo-video.tsx` — autoplay/muted/loop/playsinline/poster
+  with no controls chrome by default, a real adjacent text alternative, and
+  `prefers-reduced-motion` swapping to the poster frame plus a link rather
+  than ever autoplaying.
+- `/` rebuilt around evidence density: a hero finding computed at build time
+  by the real engine against the committed fixtures
+  (`src/lib/hero-diff.ts`) — not a hand-written example — with its tier
+  badge and the CI exit code it would produce, then the diagram, the demo,
+  the positioning table, an exit-code table with a "who fixes it" column,
+  and install.
+- `/docs`: install, a five-minute quickstart (verified against a real CLI
+  run, not invented — the transcript in the page is the actual output),
+  the snapshot format, the diff taxonomy (the full generated rule catalog),
+  compat/degradation checks and what the official conformance suite does
+  not cover, the board's disclosure policy, CI integration via the Action,
+  the full failure-mode contract, and limitations.
+- README: a real diff excerpt, the poster image with a link to the site for
+  the video, the tier-ladder diagram, and a quickstart section — reordered
+  around claim → proof → escape hatch throughout.
+- e2e: poster + muted/looped/chrome-less video, the `prefers-reduced-motion`
+  fallback path, the diagram rendering inline with its real title/desc, and
+  `/docs` reachability + TOC anchor integrity (`e2e/demo-video.spec.ts`,
+  `e2e/docs.spec.ts`, extended `e2e/home.spec.ts`).
+
 ## [1.0.0-rc.1] - 2026-08-09
 
 ### Added

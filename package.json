@@ -15,9 +15,12 @@
     "eval": "vitest run --project eval",
     "e2e:smoke": "pnpm --filter @snapgauge/web e2e:smoke",
     "docs:rules": "pnpm --filter snapgauge build && node scripts/generate-rules.mjs",
+    "ci:docs-check": "pnpm docs:rules && git diff --exit-code -- docs/RULES.md apps/web/src/generated",
     "ci:pack-check": "node scripts/pack-check.mjs",
     "brand": "node scripts/brand.mjs --project=snapgauge --out=apps/web/public/brand",
-    "ci:brand-check": "pnpm brand && git diff --exit-code -- apps/web/public/brand"
+    "ci:brand-check": "pnpm brand && git diff --exit-code -- apps/web/public/brand",
+    "diagram": "pnpm --filter snapgauge build && node scripts/diagram.mjs",
+    "ci:diagram-check": "pnpm diagram && git diff --exit-code -- apps/web/public/diagram"
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",

@@ -14,6 +14,12 @@ export default tseslint.config(
       parserOptions: {
         projectService: {
           allowDefaultProject: ["*.mjs", "scripts/*.mjs", "apps/*/*.mjs", "apps/*/e2e/*.mjs"],
+          // scripts/*.mjs grew past typescript-eslint's default cap of 8
+          // (diagram.mjs joined brand/generate-rules/pack-check/record-demo/
+          // run-board) — a plain project-less script count, not a sign of a
+          // real perf problem; raised deliberately rather than narrowing the
+          // glob per-file.
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 20,
         },
         tsconfigRootDir: import.meta.dirname,
       },

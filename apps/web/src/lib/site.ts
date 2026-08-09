@@ -36,6 +36,38 @@ export const POSITIONING_TABLE = [
   },
 ] as const;
 
+/** README's exit-code table (SPEC §5, load-bearing for CI): the "who fixes
+ * it" column is the point — 1 vs 3 is a different owner, different fix. */
+export const EXIT_CODE_TABLE = [
+  { code: 0, meaning: "Clean — no findings at/above the gate.", whoFixesIt: "Nobody — nothing to do." },
+  {
+    code: 1,
+    meaning: "Drift at/above the gate (--fail-on, default risky).",
+    whoFixesIt:
+      "The consumer: review the diff, then either --update the stored snapshot (drift was intentional) or fix/pin the server.",
+  },
+  {
+    code: 2,
+    meaning: "Probe/connection failure (unreachable, auth, timeout, malformed response).",
+    whoFixesIt: "The consumer's environment/config — check the target URL, credentials, and network reachability.",
+  },
+  {
+    code: 3,
+    meaning: "Compat/degradation violation — the server is wrong, not merely different.",
+    whoFixesIt: "The server's maintainer — it violates the 2026-07-28 revision's degradation contract.",
+  },
+  {
+    code: 4,
+    meaning: "Usage/config/snapshot-format error (incl. probe-spec mismatch: re-record).",
+    whoFixesIt: "The consumer — fix the CLI invocation or config, or re-run snapgauge record.",
+  },
+  {
+    code: 5,
+    meaning: "Internal error — a bug in snapgauge itself.",
+    whoFixesIt: "snapgauge's maintainer — please report it (SECURITY.md).",
+  },
+] as const;
+
 export const LIMITATIONS = [
   "Auth-gated tools: the hosted /live check never accepts a bearer token, so it can only audit a server's unauthenticated discovery surface.",
   "Per-tenant tool sets: if a server returns a different tools/list per API key, snapgauge only ever sees the one it was configured to see.",

@@ -1,3 +1,7 @@
+<p align="left">
+  <img src="apps/web/public/brand/lockup.svg" alt="snapgauge — by Agent James" height="48">
+</p>
+
 # snapgauge
 
 **Contract tests for MCP servers. Record a snapshot of a server's schema and
@@ -13,42 +17,59 @@ offline-capable, zero LLM.**
 > actual publish and the first push of a `v*` tag are James's call, not this
 > build's (`.github/workflows/release.yml` is committed, unrun).
 >
-> Working today, proven by the five-stage CI (typecheck → lint → unit → e2e:smoke
-> → eval, plus build/pack-check/brand-drift guards) and 37 golden/compat eval
-> cases (30 golden + 7 compat, SPEC §7's ≥30-case bar) at 100% exact match: the
-> full snapshot + diff + compat/degradation
+> Working today, proven by the eight-stage CI (typecheck → lint → unit →
+> e2e:smoke → eval → build → pack-check → brand/diagram/docs-drift) and 333
+> tests (281 unit + 52 eval, including 37 golden/compat cases at 100% exact
+> match, SPEC §7's ≥30-case bar): the full snapshot + diff + compat/degradation
 > engine (`record`/`check`/`diff`/`compat`/`ci`) over `http`, `stdio`, and
 > `fixture` transports; the CLI; the composite [`action.yml`](action.yml)
 > GitHub Action; and the demo site — `/` (static), `/demo` (the real engine,
 > offline, in a Web Worker), `/live` + `POST /api/check` (an SSRF-guarded,
-> rate-limited, read-only live audit of a visitor-named server), and `/board`
-> (the schema, the weekly Actions job, the disclosure-policy validator, and the
-> render path are all built and tested — `boards/roster.json` ships empty on
-> purpose, since which public servers belong on it is James's call, SPEC §11
-> Q1, so `/board` still shows the honest empty state until that's decided).
+> rate-limited, read-only live audit of a visitor-named server), `/docs`, and
+> `/board` (the schema, the weekly Actions job, the disclosure-policy
+> validator, and the render path are all built and tested —
+> `boards/roster.json` ships empty on purpose, since which public servers
+> belong on it is James's call, SPEC §11 Q1, so `/board` still shows the
+> honest empty state until that's decided).
 
-## Install
+## A real diff
+
+Two recorded snapshots of the same fixture server, one version apart
+(`clean@v1` → `drift-breaking@v2`, `packages/fixtures/src/drift.ts`), diffed
+by the real engine — not a hand-written example:
 
 ```
-npx snapgauge@1 init --url https://mcp.example.com/mcp   # or --command / --fixture
-npx snapgauge@1 record                                    # writes .snapgauge/<target>.snapshot.json
-npx snapgauge@1 check                                      # probe live -> diff vs stored -> gate -> exit code
+breaking   tool.input.required.added          tools.get_weather.inputSchema.required.date — input "date" is now required — a client recorded against the old contract does not send it
+breaking   tool.removed                       tools.archive_note — tool "archive_note" was removed — a client holding the old contract will fail
+risky      tool.description.changed           tools.get_weather.description — description changed — the trigger surface a model routes on (SPEC §5: risky, not cosmetic)
+compatible tool.input.optional.added          tools.list_notes.inputSchema.properties.cursor — optional input "cursor" was added
+cosmetic   serverInfo.version.changed         discover.serverInfo.version — serverInfo.version changed
+cosmetic   tool.icons.changed                 tools.get_weather.icons — icons changed
+6 findings (2 breaking, 1 risky, 1 compatible, 2 cosmetic); gate fail-on=risky -> DRIFT (exit 1)
 ```
 
-Or as a GitHub Action, against a snapshot already committed to your repo:
+Same pair, live: [snapgauge.vercel.app](https://snapgauge.vercel.app) renders
+this exact diff in the page, computed at build time from the same fixtures.
+Full taxonomy and why descriptions are `risky` rather than cosmetic:
+[docs](https://snapgauge.vercel.app/docs#diff-taxonomy).
 
-```yaml
-- uses: jamessuuu/snapgauge@v1
-  with:
-    config: snapgauge.config.json   # default
-    fail-on: risky                  # default (SPEC §5)
-    # target: my-server             # only needed when the config has more than one
-```
+## Watch it run
 
-See [`action.yml`](action.yml) for every input/output; it runs `snapgauge check`
-and turns the result into GitHub Actions annotations plus a job summary table,
-reusing `snapgauge report` (the same pure reformatter the CLI itself uses) —
-no second live check against your server to build the summary.
+<img src="apps/web/public/demo/snapgauge-poster.png" alt="snapgauge landing page — poster frame for the demo recording" width="640">
+
+Recording (webm, muted, no audio) of the pair above, run on the deployed
+`/demo`: [snapgauge.vercel.app](https://snapgauge.vercel.app) — the video is
+embedded directly on the landing page.
+
+## The four tiers
+
+![The four diff tiers, drawn as a ladder: breaking at top through cosmetic at bottom, risky is the one amber rung](apps/web/public/diagram/tier-ladder.svg)
+
+Generated by `scripts/diagram.mjs` from the same rule registry as
+`docs/RULES.md` — `pnpm diagram` regenerates it, CI fails on drift
+(`pnpm ci:diagram-check`). `risky` is the one amber rung on purpose: a tool's
+description and title are the trigger surface a model routes on, so a
+rewrite is treated as a behavior change, not a cosmetic one.
 
 ## Why
 
@@ -73,6 +94,45 @@ compliance today; run snapgauge to catch what changed since your last release.
 product:** no dashboard, no accounts, no roadmap of adjacent features. It
 answers exactly the drift/compatibility question above and nothing else; see
 Non-goals and Limitations below for what it deliberately does not attempt.
+
+## Install
+
+```
+npx snapgauge@1 init --url https://mcp.example.com/mcp   # or --command / --fixture
+npx snapgauge@1 record                                    # writes .snapgauge/<target>.snapshot.json
+npx snapgauge@1 check                                      # probe live -> diff vs stored -> gate -> exit code
+```
+
+Or as a GitHub Action, against a snapshot already committed to your repo:
+
+```yaml
+- uses: jamessuuu/snapgauge@v1
+  with:
+    config: snapgauge.config.json   # default
+    fail-on: risky                  # default (SPEC §5)
+    # target: my-server             # only needed when the config has more than one
+```
+
+See [`action.yml`](action.yml) for every input/output; it runs `snapgauge check`
+and turns the result into GitHub Actions annotations plus a job summary table,
+reusing `snapgauge report` (the same pure reformatter the CLI itself uses) —
+no second live check against your server to build the summary.
+
+## Quickstart
+
+The diff at the top of this README, reproduced on your own machine, no MCP
+server of your own required:
+
+```
+git clone https://github.com/jamessuuu/snapgauge
+cd snapgauge && pnpm install && pnpm --filter snapgauge build
+node packages/snapgauge/dist/cli/index.js record demo --fixture clean@v1 --dir /tmp/snapgauge-demo
+node packages/snapgauge/dist/cli/index.js record demo-v2 --fixture drift-breaking@v2 --dir /tmp/snapgauge-demo
+node packages/snapgauge/dist/cli/index.js diff /tmp/snapgauge-demo/demo.snapshot.json /tmp/snapgauge-demo/demo-v2.snapshot.json
+```
+
+Full five-minute walkthrough, the snapshot format, and why it captures shape
+rather than values: [docs](https://snapgauge.vercel.app/docs#quickstart).
 
 ## Non-goals
 
@@ -113,13 +173,16 @@ the spec's degradation contract.
 | 4 | Usage/config/snapshot-format error (incl. probe-spec mismatch: re-record). | The consumer — fix the CLI invocation or config, or re-run `snapgauge record`. |
 | 5 | Internal error — a bug in snapgauge itself. | snapgauge's maintainer — please [report it](SECURITY.md#reporting). |
 
+Full failure-mode contract (target unreachable, stdio hangs, rate limits,
+board dead-man banner, and more): [docs](https://snapgauge.vercel.app/docs#failure-modes).
+
 ## Monorepo
 
 | Package | Purpose |
 |---|---|
 | `snapgauge` | The published package: core engine (isomorphic, zero I/O), node transports, CLI. |
 | `@snapgauge/fixtures` | Private. Pure `(request, profile) => response` fixture servers for the eval set and the offline demo. |
-| `apps/web` | Next.js demo site — `/`, `/demo`, `/live` + `/api/check`, `/board`. |
+| `apps/web` | Next.js demo site — `/`, `/demo`, `/live` + `/api/check`, `/docs`, `/board`. |
 
 Root [`action.yml`](action.yml) is the published composite GitHub Action
 (`uses: jamessuuu/snapgauge@v1`), not a workspace package.
