@@ -23,7 +23,7 @@ for (const route of ROUTES) {
     const footer = page.locator("footer");
     await expect(footer).toBeVisible();
     await expect(footer.getByText("James Lorenz Santos")).toBeVisible();
-    await expect(footer.getByRole("link", { name: "agentjames.vercel.app" })).toHaveAttribute(
+    await expect(footer.getByRole("link", { name: "James Lorenz Santos" })).toHaveAttribute(
       "href",
       "https://agentjames.vercel.app",
     );
