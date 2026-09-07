@@ -11,19 +11,19 @@ import { Attribution } from "./attribution";
  */
 export function Footer() {
   return (
-    <footer className="border-t border-rule mt-16">
-      <div className="mx-auto max-w-4xl px-6 py-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-ink/70">
+    <footer className="border-t border-rule bg-surface">
+      <div className="mx-auto max-w-6xl px-6 py-10 flex flex-wrap items-center gap-x-5 gap-y-3 text-sm text-ink-3">
         <Attribution linkClassName="hover:text-amber underline underline-offset-2" />
         <span aria-hidden="true" className="text-rule">
           ·
         </span>
-        <a href={SITE.repoUrl} className="hover:text-amber underline underline-offset-2">
+        <a href={SITE.repoUrl} className="inline-flex min-h-10 items-center rounded-[var(--radius-control)] px-2 underline underline-offset-2 transition-colors duration-[var(--dur-fast)] hover:bg-surface-2 hover:text-amber">
           GitHub repo
         </a>
         <span aria-hidden="true" className="text-rule">
           ·
         </span>
-        <a href="/schema/v1.json" className="hover:text-amber underline underline-offset-2">
+        <a href="/schema/v1.json" className="inline-flex min-h-10 items-center rounded-[var(--radius-control)] px-2 underline underline-offset-2 transition-colors duration-[var(--dur-fast)] hover:bg-surface-2 hover:text-amber">
           config schema
         </a>
       </div>

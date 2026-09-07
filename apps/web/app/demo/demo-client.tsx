@@ -47,29 +47,41 @@ export function DemoClient() {
 
   return (
     <div className="mt-10">
-      <fieldset className="border border-rule p-4">
-        <legend className="px-1 text-sm font-semibold uppercase tracking-wide text-ink/60">
+      <fieldset className="border-0 p-0">
+        <legend className="mb-3 font-mono text-[0.72rem] uppercase tracking-[0.12em] text-ink-3">
           Fixture pair (base: clean@v1)
         </legend>
-        <div className="mt-2 grid gap-3 sm:grid-cols-2">
-          {DEMO_PAIRS.map((pair) => (
-            <label key={pair.id} className="flex cursor-pointer items-start gap-2 text-sm">
-              <input
-                type="radio"
-                name="pair"
-                value={pair.id}
-                checked={pairId === pair.id}
-                onChange={() => {
-                  selectPair(pair.id);
-                }}
-                className="mt-1"
-              />
-              <span>
-                <span className="block font-mono">clean@v1 → {pair.label}</span>
-                <span className="block text-ink/60">{pair.blurb}</span>
-              </span>
-            </label>
-          ))}
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          {DEMO_PAIRS.map((pair) => {
+            const selected = pairId === pair.id;
+            return (
+              <label
+                key={pair.id}
+                className={`group relative flex cursor-pointer items-start gap-3 rounded-[var(--radius-brand)] p-4 text-sm transition-[background-color,box-shadow,transform] duration-[var(--dur-fast)] ${
+                  selected
+                    ? "bg-amber/10 shadow-[var(--edge-top),var(--elev-1)] ring-1 ring-amber/40"
+                    : "bg-surface shadow-[var(--edge-top)] hover:bg-surface-2"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="pair"
+                  value={pair.id}
+                  checked={selected}
+                  onChange={() => {
+                    selectPair(pair.id);
+                  }}
+                  className="mt-0.5 size-4 shrink-0 accent-amber"
+                />
+                <span className="min-w-0">
+                  <span className={`block font-mono ${selected ? "text-ink" : "text-ink-2"}`}>
+                    clean@v1 → {pair.label}
+                  </span>
+                  <span className="mt-1 block leading-snug text-ink-3">{pair.blurb}</span>
+                </span>
+              </label>
+            );
+          })}
         </div>
       </fieldset>
 
@@ -77,27 +89,59 @@ export function DemoClient() {
         type="button"
         onClick={run}
         disabled={status === "running"}
-        className="mt-4 border border-ink px-4 py-2 text-sm font-medium hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-50"
+        className="btn btn-primary mt-6 disabled:pointer-events-none disabled:opacity-50"
       >
-        {status === "running" ? "Running…" : "Run"}
+        {status === "running" ? (
+          <>
+            <span className="size-2 animate-pulse rounded-full bg-current" aria-hidden="true" />
+            Running…
+          </>
+        ) : (
+          <>
+            Run the diff
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d="M3 8h10M9 4l4 4-4 4"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </>
+        )}
       </button>
 
       <div className="mt-8 min-h-8" aria-live="polite">
         {result !== null &&
           (result.ok ? (
             <>
-              <p className="text-sm">
-                exit code: <strong>{EXIT_LABEL[result.exitCode] ?? String(result.exitCode)}</strong>
-                {result.gate !== undefined && (
-                  <>
-                    {" "}
-                    — gate <code className="font-mono">fail-on={result.gate.failOn}</code>{" "}
-                    {result.gate.failed ? "FAILED" : "passed"}
-                  </>
-                )}
-              </p>
+              <div className="flex flex-wrap items-center gap-4 rounded-[var(--radius-brand)] bg-surface p-4 shadow-[var(--edge-top),var(--elev-1)]">
+                <span
+                  className={`inline-flex size-14 shrink-0 items-center justify-center rounded-[10px] font-mono text-3xl font-medium ${
+                    result.exitCode === 0
+                      ? "bg-ok/12 text-ok ring-1 ring-ok/30"
+                      : "bg-breaking/12 text-breaking ring-1 ring-breaking/30"
+                  }`}
+                >
+                  {result.exitCode}
+                </span>
+                <span className="min-w-0 text-sm">
+                  <span className="block font-mono text-[0.7rem] uppercase tracking-[0.1em] text-ink-3">
+                    exit code
+                  </span>
+                  <span className="mt-1 block text-base font-semibold">
+                    {EXIT_LABEL[result.exitCode] ?? String(result.exitCode)}
+                  </span>
+                  {result.gate !== undefined && (
+                    <span className="mt-1 block font-mono text-xs text-ink-3">
+                      gate fail-on={result.gate.failOn} · {result.gate.failed ? "FAILED" : "passed"}
+                    </span>
+                  )}
+                </span>
+              </div>
               {result.incomplete === true && (
-                <p className="mt-2 border border-amber px-3 py-2 text-sm text-amber">
+                <p className="mt-3 rounded-[var(--radius-control)] bg-amber/10 px-3.5 py-2.5 text-sm text-amber ring-1 ring-amber/30">
                   INCOMPLETE: at least one probe produced no evidence — treated as not passing, never as
                   &quot;no change&quot; (SPEC §6).
                   {result.probeFailures !== undefined && result.probeFailures.length > 0 && (
@@ -112,7 +156,7 @@ export function DemoClient() {
               </div>
             </>
           ) : (
-            <p className="border border-amber px-4 py-3 text-sm">
+            <p className="rounded-[var(--radius-brand)] bg-amber/10 px-4 py-3.5 text-sm ring-1 ring-amber/30">
               <strong>exit code {result.exitCode}</strong>
               {result.error !== undefined && (
                 <>

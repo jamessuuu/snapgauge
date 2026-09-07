@@ -1,42 +1,321 @@
 @import "tailwindcss";
 
 /*
- * Palette binding (BRAND-KIT.md / agentjames docs/DESIGN.md — binding, do
- * not invent colours): PAPER background, INK text/strokes, AMBER the one
- * signal colour, RULE hairlines. 0-2px radius, no gradients, no glow, no
- * dark chrome anywhere in this app.
+ * Palette binding (BRAND-KIT.md / agentjames docs/DESIGN.md): PAPER is the
+ * page ground, INK is text/strokes, AMBER is the one signal colour, RULE is
+ * the hairline.
+ *
+ * 2026-09-07 — PRODUCT SURFACE. Those four ROLES are unchanged; what they
+ * resolve to now comes from the portfolio substrate's dusk lighting
+ * (~/.claude/harness-dist/substrate/substrate.css §12) rather than cream
+ * paper. The previous values plus "0-2px radius, no gradients, no glow"
+ * produced a rendered README — a page where nothing had depth and no control
+ * responded to being touched. Section 12 restores a real elevation ladder,
+ * a 10px structure radius, one easing curve with two durations, and a single
+ * ambient wash tinted by the signal hue behind the hero.
+ *
+ * Every `bg-paper` / `text-ink` / `border-rule` utility already written
+ * across this app keeps working unchanged.
  */
 @theme {
-  --color-paper: #faf7f2;
-  --color-ink: #1a1712;
-  --color-amber: #b45309;
-  --color-rule: #e4ddd3;
+  --color-paper: oklch(0.146 0.013 250);
+  --color-surface: oklch(0.188 0.013 250);
+  --color-surface-2: oklch(0.228 0.013 250);
+  --color-surface-3: oklch(0.268 0.012 250);
+  --color-rule: oklch(0.308 0.011 250);
+  --color-edge: oklch(0.428 0.011 250);
+
+  --color-ink: oklch(0.96 0.004 250);
+  --color-ink-2: oklch(0.80 0.008 250);
+  --color-ink-3: oklch(0.665 0.010 250);
+
+  --color-amber: oklch(0.79 0.145 68);
+  --color-amber-soft: oklch(0.30 0.06 68);
+  --color-amber-ink: oklch(0.16 0.02 68);
+
+  /* Tier colours. The four rungs are the product's core vocabulary, so they
+     get four distinguishable hues rather than four shades of one. */
+  --color-breaking: oklch(0.72 0.19 27);
+  --color-risky: oklch(0.79 0.145 68);
+  --color-compatible: oklch(0.78 0.13 232);
+  --color-cosmetic: oklch(0.665 0.010 250);
+  --color-ok: oklch(0.78 0.16 152);
+
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono:
     ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+
+  --radius-brand: 10px;
+  --radius-control: 8px;
+  --ease-brand: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:root {
+  --elev-1: 0 1px 2px -1px oklch(0.08 0.03 262 / 0.45), 0 4px 12px -4px oklch(0.08 0.03 262 / 0.4);
+  --elev-2: 0 2px 4px -2px oklch(0.08 0.03 262 / 0.5), 0 12px 32px -8px oklch(0.08 0.03 262 / 0.5);
+  --elev-3: 0 4px 8px -4px oklch(0.08 0.03 262 / 0.55), 0 28px 64px -12px oklch(0.08 0.03 262 / 0.62);
+  --edge-top: inset 0 1px 0 var(--color-edge);
+  --dur-fast: 140ms;
+  --dur-slow: 420ms;
 }
 
 html {
-  color-scheme: light;
+  color-scheme: dark;
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A long rule id or URL in inline code must wrap rather than widen the page
+   on a phone; block code scrolls inside its own box instead. */
+code {
+  overflow-wrap: anywhere;
+}
+pre {
+  overflow-x: auto;
+}
+pre code {
+  overflow-wrap: normal;
 }
 
 /* Every interactive control keeps a visible focus ring — no gesture-only
    affordances (this app must be usable with a keyboard alone). */
 :focus-visible {
-  outline: 2px solid var(--color-amber);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--color-paper),
+    0 0 0 4px var(--color-amber);
+  border-radius: var(--radius-control);
 }
 
 ::selection {
-  background: var(--color-amber);
-  color: var(--color-paper);
+  background: var(--color-amber-soft);
+  color: var(--color-ink);
+}
+
+@layer components {
+  .panel {
+    border-radius: var(--radius-brand);
+    background: var(--color-surface);
+    box-shadow: var(--edge-top), var(--elev-1);
+    transition:
+      box-shadow var(--dur-slow) var(--ease-brand),
+      transform var(--dur-slow) var(--ease-brand);
+  }
+  .panel-hover:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--edge-top), var(--elev-2);
+  }
+  .float {
+    border-radius: var(--radius-brand);
+    background: var(--color-surface);
+    box-shadow: var(--edge-top), var(--elev-3);
+  }
+  .edge-top {
+    box-shadow: var(--edge-top);
+  }
+
+  .ambient {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+  .ambient::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: -30% -20% auto -20%;
+    height: 150%;
+    pointer-events: none;
+    background:
+      radial-gradient(52% 46% at 14% 3%, oklch(0.86 0.19 68 / 0.15), transparent 68%),
+      radial-gradient(44% 42% at 88% 2%, oklch(0.78 0.13 232 / 0.12), transparent 70%);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 46px;
+    padding-inline: 1.15rem;
+    border-radius: var(--radius-control);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    transition:
+      transform var(--dur-fast) var(--ease-brand),
+      box-shadow var(--dur-fast) var(--ease-brand),
+      background-color var(--dur-fast) var(--ease-brand),
+      color var(--dur-fast) var(--ease-brand);
+  }
+  .btn-primary {
+    background: var(--color-amber);
+    color: var(--color-amber-ink);
+    box-shadow: var(--elev-1);
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--elev-2);
+    background: oklch(0.84 0.15 68);
+  }
+  .btn-ghost {
+    background: var(--color-surface-2);
+    color: var(--color-ink);
+    box-shadow: var(--edge-top), var(--elev-1);
+  }
+  .btn-ghost:hover {
+    transform: translateY(-2px);
+    background: var(--color-surface-3);
+    box-shadow: var(--edge-top), var(--elev-2);
+  }
+
+  .kicker {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    line-height: 1;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-amber);
+  }
+  .eyebrow-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--color-amber);
+    padding: 0.5rem 0.75rem 0.5rem 0.6rem;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--color-amber) 12%, var(--color-surface));
+    box-shadow: var(--edge-top);
+  }
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--color-amber);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-amber) 22%, transparent);
+  }
+  .display-1 {
+    font-size: clamp(2.5rem, 1.45rem + 4.4vw, 4.15rem);
+    line-height: 0.99;
+    font-weight: 600;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+  }
+  .display-2 {
+    font-size: clamp(1.75rem, 1.2rem + 2.1vw, 2.6rem);
+    line-height: 1.06;
+    font-weight: 600;
+    letter-spacing: -0.028em;
+    text-wrap: balance;
+  }
+  .readout-n {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: clamp(2.4rem, 1.6rem + 3vw, 3.6rem);
+    line-height: 0.9;
+    font-weight: 500;
+    letter-spacing: -0.035em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The four tiers, as one consistent chip everywhere they appear. */
+  .tier-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 26px;
+    padding-inline: 0.55rem;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .tier-breaking {
+    color: var(--color-breaking);
+    background: color-mix(in oklab, var(--color-breaking) 20%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-breaking) 36%, transparent);
+  }
+  .tier-risky {
+    color: var(--color-risky);
+    background: color-mix(in oklab, var(--color-risky) 18%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-risky) 34%, transparent);
+  }
+  .tier-compatible {
+    color: var(--color-compatible);
+    background: color-mix(in oklab, var(--color-compatible) 16%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-compatible) 30%, transparent);
+  }
+  .tier-cosmetic {
+    color: var(--color-ink-3);
+    background: var(--color-surface-3);
+    box-shadow: inset 0 0 0 1px var(--color-rule);
+  }
+
+  @keyframes sg-rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .rise {
+    animation: sg-rise var(--dur-slow) var(--ease-brand) both;
+  }
+  .rise-1 {
+    animation-delay: 70ms;
+  }
+  .rise-2 {
+    animation-delay: 140ms;
+  }
+  .rise-3 {
+    animation-delay: 210ms;
+  }
+  .rise-4 {
+    animation-delay: 300ms;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .rise {
+    animation: none;
+  }
+  .btn:hover,
+  .panel-hover:hover {
+    transform: none;
+  }
 }
 
 /* attribution-kit v1 — the maker's mark. In the components layer so the links' Tailwind utilities still win. */

@@ -26,10 +26,16 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { RULES } from "../packages/snapgauge/dist/core/diff/rules.js";
 
-const PAPER = "#FAF7F2";
-const INK = "#1A1712";
-const AMBER = "#B45309";
-const RULE = "#E4DDD3";
+// 2026-09-07: same four ROLES, resolved against the substrate's dusk
+// lighting instead of cream paper (apps/web/app/globals.css). PAPER is the
+// diagram's own ground and must match the panel it is inlined into; INK is
+// every rail and label; AMBER stays the one signal colour; RULE is the
+// hairline. These are the sRGB resolutions of that file's --color-surface /
+// --color-ink / --color-amber / --color-rule tokens.
+const PAPER = "#0F1419";
+const INK = "#F0F2F4";
+const AMBER = "#F7A745";
+const RULE = "#2C3035";
 
 const SANS =
   "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";

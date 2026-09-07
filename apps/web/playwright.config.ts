@@ -6,6 +6,12 @@ import { defineConfig, devices } from "@playwright/test";
  * not the dev server: the "renders with JS disabled" test needs real
  * server-rendered HTML, and a production build is what actually ships.
  */
+// Port is overridable so a run never silently binds to — or reuses — a
+// server another project left behind. A stranger's server on a fixed port
+// makes every assertion here run against a DIFFERENT project's HTML.
+const PORT = Number(process.env.SNAPGAUGE_E2E_PORT ?? 3100);
+const BASE = `http://127.0.0.1:${String(PORT)}`;
+
 export default defineConfig({
   testDir: "./e2e",
   // The boards/ fixture the board.spec.ts dead-man-banner test needs is
@@ -18,7 +24,7 @@ export default defineConfig({
   ...(process.env.CI === "true" ? { workers: 1 } : {}),
   reporter: process.env.CI === "true" ? "line" : "html",
   use: {
-    baseURL: "http://127.0.0.1:3100",
+    baseURL: BASE,
     trace: "retain-on-failure",
   },
   projects: [
@@ -28,9 +34,10 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "pnpm build && pnpm start",
-    url: "http://127.0.0.1:3100",
-    reuseExistingServer: process.env.CI !== "true",
-    timeout: 180_000,
+    command: `pnpm build && npx next start -p ${String(PORT)}`,
+    url: BASE,
+    // Never reuse: failing to bind is the correct, loud outcome.
+    reuseExistingServer: false,
+    timeout: 240_000,
   },
 });

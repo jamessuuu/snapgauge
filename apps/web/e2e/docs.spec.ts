@@ -3,7 +3,10 @@ import { expect, test } from "@playwright/test";
 test.describe("/docs", () => {
   test("is reachable from the landing page and renders every section", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("link", { name: "Docs", exact: true }).click();
+    // Reachable from the site chrome, which is on every page — the landing
+    // page's own CTA row is now the two things a visitor should DO first
+    // (run the demo, check a live server), not a row of every route.
+    await page.locator("header").getByRole("link", { name: "docs", exact: true }).click();
     await expect(page).toHaveURL(/\/docs$/);
 
     const sections = [

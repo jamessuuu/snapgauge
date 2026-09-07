@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Footer } from "@/components/footer";
+import { Header } from "@/components/header";
 import { SITE } from "@/lib/site";
 import "./globals.css";
 
@@ -42,6 +43,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen flex flex-col bg-paper text-ink antialiased">
+        <Header />
         <div className="flex-1">{children}</div>
         <Footer />
       </body>
